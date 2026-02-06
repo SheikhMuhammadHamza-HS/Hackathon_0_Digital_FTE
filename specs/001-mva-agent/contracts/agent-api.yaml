@@ -1,0 +1,243 @@
+openapi: 3.0.0
+info:
+  title: Minimum Viable Agent API
+  description: API for controlling and monitoring the Digital FTE agent
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /agent/start:
+    post:
+      summary: Start the agent
+      description: Begin monitoring the Inbox folder for new files
+      responses:
+        '200':
+          description: Agent started successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "started"
+                  message:
+                    type: string
+                    example: "Agent started monitoring /Inbox"
+                  started_at:
+                    type: string
+                    format: date-time
+                    example: "2026-02-06T10:00:00Z"
+        '409':
+          description: Agent already running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Agent already running"
+
+  /agent/stop:
+    post:
+      summary: Stop the agent
+      description: Stop monitoring and gracefully shut down the agent
+      responses:
+        '200':
+          description: Agent stopped successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "stopped"
+                  message:
+                    type: string
+                    example: "Agent stopped successfully"
+                  stopped_at:
+                    type: string
+                    format: date-time
+                    example: "2026-02-06T10:05:00Z"
+        '400':
+          description: Agent not currently running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Agent is not running"
+
+  /agent/status:
+    get:
+      summary: Get agent status
+      description: Retrieve current status and statistics of the agent
+      responses:
+        '200':
+          description: Current agent status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [idle, monitoring, processing, paused, error]
+                    example: "monitoring"
+                  uptime:
+                    type: integer
+                    description: Uptime in seconds
+                    example: 3600
+                  files_processed:
+                    type: integer
+                    example: 24
+                  files_pending:
+                    type: integer
+                    example: 2
+                  errors_count:
+                    type: integer
+                    example: 0
+                  last_processed:
+                    type: string
+                    format: date-time
+                    example: "2026-02-06T09:55:00Z"
+                  inbox_path:
+                    type: string
+                    example: "./Inbox"
+                  needs_action_path:
+                    type: string
+                    example: "./Needs_Action"
+                  done_path:
+                    type: string
+                    example: "./Done"
+
+  /dashboard:
+    get:
+      summary: Get dashboard data
+      description: Retrieve the current dashboard information showing processed files
+      responses:
+        '200':
+          description: Current dashboard data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          example: "file123"
+                        display_name:
+                          type: string
+                          example: "report.pdf"
+                        timestamp:
+                          type: string
+                          format: date-time
+                          example: "2026-02-06T09:30:00Z"
+                        status:
+                          type: string
+                          example: "Done"
+                        duration:
+                          type: number
+                          example: 2.5
+                        file_type:
+                          type: string
+                          example: "PDF"
+                  last_updated:
+                    type: string
+                    format: date-time
+                    example: "2026-02-06T09:30:05Z"
+
+  /process-trigger:
+    post:
+      summary: Manually process a trigger file
+      description: Process a specific trigger file outside of normal workflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [trigger_file_path]
+              properties:
+                trigger_file_path:
+                  type: string
+                  description: Path to the trigger file to process
+                  example: "./Needs_Action/TRIGGER_20260206100000.md"
+      responses:
+        '200':
+          description: Trigger processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  processed_file:
+                    type: string
+                    example: "report.pdf"
+                  moved_to:
+                    type: string
+                    example: "./Done/report.pdf"
+        '400':
+          description: Invalid trigger file path
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid trigger file path"
+        '500':
+          description: Processing error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Failed to process trigger file"
+
+components:
+  schemas:
+    FileMetadata:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the file
+        original_path:
+          type: string
+          description: Absolute path to original file
+        file_size:
+          type: integer
+          description: Size in bytes
+        file_type:
+          type: string
+          description: Detected file type
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        created_at:
+          type: string
+          format: date-time
+        processed_at:
+          type: string
+          format: date-time
+        trigger_file_path:
+          type: string
+          description: Path to corresponding trigger file

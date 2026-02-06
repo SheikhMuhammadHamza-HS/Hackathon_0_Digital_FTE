@@ -1,0 +1,218 @@
+{
+  "main": {
+    "id": "4369a17e156553b3",
+    "type": "split",
+    "children": [
+      {
+        "id": "f8a91a4c232485b9",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "31634e6ed148f570",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "75baf1f0f7473fdd",
+    "type": "split",
+    "children": [
+      {
+        "id": "af2caf2f3900818a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "401af7d22db284f1",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "50b4f0171895d2c9",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "8ea3f2df014dc84b",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "583874c64c28ccc1",
+    "type": "split",
+    "children": [
+      {
+        "id": "1856a82df810f52e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4b839cfff2d7fd4a",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "b4ac42bf17ac10cf",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "7a14517ae6fb6154",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "3f7be3dc86995d69",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "9004052053a890fd",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "401af7d22db284f1",
+  "lastOpenFiles": [
+    "Done/query.txt",
+    "Needs_Action/TRIGGER_20260206045615364.md",
+    "Inbox/query.txt",
+    "query.txt",
+    "Done/paris_test.txt",
+    "Needs_Action/TRIGGER_20260206045533492.md",
+    "Inbox/paris_test.txt",
+    "Needs_Action/TRIGGER_20260206045328480.md",
+    "Needs_Action/TRIGGER_20260206045328478.md",
+    "Needs_Action/TRIGGER_20260206045328170.md",
+    "Done/question.txt",
+    "Needs_Action/TRIGGER_20260206045325557.md",
+    "Inbox/question.txt",
+    "question.txt",
+    "Needs_Action/TRIGGER_20260206045213121.md",
+    "Done/light_speed_test.txt",
+    "Needs_Action/TRIGGER_20260206045211030.md",
+    "Needs_Action/TRIGGER_20260206045211003.md",
+    "Inbox/light_speed_test.txt",
+    "light_speed_test.txt",
+    "Needs_Action/TRIGGER_20260206044425676.md",
+    "Needs_Action/TRIGGER_20260206044106369.md",
+    "Needs_Action/TRIGGER_20260206043711888.md",
+    "Needs_Action/TRIGGER_20260206043005775.md",
+    "Needs_Action/TRIGGER_20260206041014837.md",
+    "GEMINI_UPGRADE_GUIDE.md",
+    "Needs_Action/TRIGGER_20260206040208608.md",
+    "Needs_Action/TRIGGER_20260206035929302.md",
+    "Needs_Action/TRIGGER_20260206035929273.md",
+    "Needs_Action/TRIGGER_20260206035929010.md",
+    "Needs_Action/TRIGGER_20260206035928968.md",
+    "Needs_Action/TRIGGER_20260206035050038.md",
+    "Needs_Action/TRIGGER_20260206035050034.md",
+    "Needs_Action/TRIGGER_20260206035050024.md",
+    "Needs_Action/TRIGGER_20260206034857823.md",
+    "Needs_Action/TRIGGER_20260206034857818.md"
+  ]
+}

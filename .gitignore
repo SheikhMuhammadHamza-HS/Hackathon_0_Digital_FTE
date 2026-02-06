@@ -1,0 +1,121 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.coverage
+.cache
+.pytest_cache/
+htmlcov/
+.tox/
+.coverage.*
+.nox/
+.venv/
+venv/
+ENV/
+env/
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.dev
+.env.production
+.env.staging
+.env.test
+.env.example
+
+# Logs
+*.log
+logs/
+log/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+iTunes Music Library.xml
+Thumbs.db
+Thumbs.tps
+.codiad-project
+.project
+.tm_properties
+*.swp
+*.swo
+*~
+
+# IDE specific
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+nbproject/
+.settings/
+
+# Backup files
+*~
+*.bak
+*.tmp
+*.backup
+
+# Compiled files
+*.class
+*.o
+*.so
+*.dylib
+
+# Distribution / packaging
+.Python
+env/
+venv/
+ENV/
+.venv
+env.bak
+venv.bak
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.hypothesis/
+.mypy_cache/
+nox/
+coverage.xml
+*.cover
+
+# Documentation
+docs/_build/
+
+# Local development
+local/
+tmp/
+temp/
+
+# Application specific
+Inbox/
+Needs_Action/
+Done/
+Logs/
+Dashboard.md
+*.tmp
