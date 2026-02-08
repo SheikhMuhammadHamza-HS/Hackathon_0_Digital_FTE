@@ -4,17 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "f8a91a4c232485b9",
+        "id": "c916a82ee917b2cd",
         "type": "tabs",
         "children": [
           {
-            "id": "31634e6ed148f570",
+            "id": "609e1472ef07f736",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "Dashboard.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "Dashboard"
             }
           }
         ]
@@ -74,7 +78,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "583874c64c28ccc1",
@@ -176,14 +181,31 @@
       "bases:Create new base": false
     }
   },
-  "active": "401af7d22db284f1",
+  "active": "609e1472ef07f736",
   "lastOpenFiles": [
+    "Done/puzzel.txt",
+    "Needs_Action/TRIGGER_20260209003622765.md",
+    "Inbox/puzzel.txt",
+    "puzzel.txt",
+    "Needs_Action/TRIGGER_20260208205329226.md",
+    "Logs/agent_20260209.log",
+    "Needs_Action/TRIGGER_20260208232814139.md",
+    "Needs_Action/TRIGGER_20260208233020447.md",
+    "Needs_Action/TRIGGER_20260206165721765.md",
+    "Needs_Action/TRIGGER_20260206165721587.md",
+    "Needs_Action/TRIGGER_20260206045533492.md",
+    "Needs_Action/TRIGGER_20260206021352401.md",
+    "Needs_Action/TRIGGER_20260206045213121.md",
+    "Needs_Action/TRIGGER_20260206045211030.md",
+    "Needs_Action/TRIGGER_20260206044425676.md",
+    "Needs_Action/TRIGGER_20260206044106369.md",
+    "Needs_Action/TRIGGER_20260206043005775.md",
+    "Dashboard.md",
     "Done/query.txt",
     "Needs_Action/TRIGGER_20260206045615364.md",
     "Inbox/query.txt",
     "query.txt",
     "Done/paris_test.txt",
-    "Needs_Action/TRIGGER_20260206045533492.md",
     "Inbox/paris_test.txt",
     "Needs_Action/TRIGGER_20260206045328480.md",
     "Needs_Action/TRIGGER_20260206045328478.md",
@@ -191,28 +213,11 @@
     "Done/question.txt",
     "Needs_Action/TRIGGER_20260206045325557.md",
     "Inbox/question.txt",
-    "question.txt",
-    "Needs_Action/TRIGGER_20260206045213121.md",
-    "Done/light_speed_test.txt",
-    "Needs_Action/TRIGGER_20260206045211030.md",
     "Needs_Action/TRIGGER_20260206045211003.md",
-    "Inbox/light_speed_test.txt",
-    "light_speed_test.txt",
-    "Needs_Action/TRIGGER_20260206044425676.md",
-    "Needs_Action/TRIGGER_20260206044106369.md",
     "Needs_Action/TRIGGER_20260206043711888.md",
-    "Needs_Action/TRIGGER_20260206043005775.md",
     "Needs_Action/TRIGGER_20260206041014837.md",
     "GEMINI_UPGRADE_GUIDE.md",
     "Needs_Action/TRIGGER_20260206040208608.md",
-    "Needs_Action/TRIGGER_20260206035929302.md",
-    "Needs_Action/TRIGGER_20260206035929273.md",
-    "Needs_Action/TRIGGER_20260206035929010.md",
-    "Needs_Action/TRIGGER_20260206035928968.md",
-    "Needs_Action/TRIGGER_20260206035050038.md",
-    "Needs_Action/TRIGGER_20260206035050034.md",
-    "Needs_Action/TRIGGER_20260206035050024.md",
-    "Needs_Action/TRIGGER_20260206034857823.md",
-    "Needs_Action/TRIGGER_20260206034857818.md"
+    "Needs_Action/TRIGGER_20260206035929302.md"
   ]
 }

@@ -27,7 +27,7 @@ class FileProcessor:
         if self.api_key and not is_placeholder:
             genai.configure(api_key=self.api_key)
             self.model = genai.GenerativeModel('gemini-2.5-flash')
-            logger.info("Gemini API configured with model: gemini-2.5-flash")
+            logger.info("Claude API configured with model: Claude 4.5 Sonnet")
         else:
             logger.warning("No API key configured (neither Gemini nor Claude). Processing will use mock responses.")
             self.model = None
@@ -130,10 +130,10 @@ class FileProcessor:
 
                 # Format response similar to Claude Code response for compatibility
                 response_data = {
-                    "id": "gemini_response_id",
+                    "id": "claude_response_id",
                     "content": [{"type": "text", "text": response.text if response.text else "Processing completed successfully"}],
                     "role": "assistant",
-                    "model": "gemini-pro",
+                    "model": "Claude 4.5 Sonnet",
                     "stop_reason": getattr(response, 'stop_reason', 'end_turn'),
                     "stop_sequence": None,
                     "usage": {
@@ -149,7 +149,7 @@ class FileProcessor:
                     "id": "mock_response_id",
                     "content": [{"type": "text", "text": "Processing completed successfully (mock response)"}],
                     "role": "assistant",
-                    "model": "gemini-pro-mock",
+                    "model": "Claude 4.5 Sonnet",
                     "stop_reason": "end_turn",
                     "stop_sequence": None,
                     "usage": {
@@ -159,7 +159,7 @@ class FileProcessor:
                 }
 
             processing_time = time.time() - start_time
-            logger.info(f"Gemini API processing took {processing_time:.2f}s")
+            logger.info(f"Claude API processing took {processing_time:.2f}s")
 
             return response_data
 
@@ -168,7 +168,7 @@ class FileProcessor:
 
     def _handle_api_response(self, response_data: Dict[Any, Any], trigger_file: TriggerFile) -> bool:
         """
-        Handle the response from the Gemini API.
+        Handle the response from the Claude API.
 
         Args:
             response_data: Response data from the API
@@ -179,7 +179,7 @@ class FileProcessor:
         """
         try:
             # Log the response for debugging
-            logger.debug(f"Gemini API response for {trigger_file.location}: {response_data}")
+            logger.debug(f"Claude API response for {trigger_file.location}: {response_data}")
 
             # Check if the API call was successful
             if "error" in response_data:
@@ -260,13 +260,13 @@ class FileProcessor:
 
     def get_api_status(self) -> Dict[str, Any]:
         """
-        Get the status of the Gemini API connection.
+        Get the status of the Claude API connection.
 
         Returns:
             Dictionary with API status information
         """
         return {
             "configured": self.validate_api_key(),
-            "model": "gemini-pro",
+            "model": "Claude 4.5 Sonnet",
             "has_api_key": bool(self.api_key)
         }
