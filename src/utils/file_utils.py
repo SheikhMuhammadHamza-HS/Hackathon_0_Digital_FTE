@@ -160,6 +160,24 @@ def get_file_creation_time(file_path: Path) -> datetime:
     return datetime.fromtimestamp(timestamp)
 
 
+def read_file_head(file_path: Path, lines: int = 10) -> str:
+    """Return the first *lines* lines of a file as a single string.
+
+    Parameters
+    ----------
+    file_path: Path
+        Path to the file.
+    lines: int, optional
+        Number of lines to return (default 10).
+    """
+    from itertools import islice
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return "".join(islice(f, lines))
+    except Exception as e:
+        raise IOError(f"Could not read file head from {file_path}: {e}")
+
+
 def sanitize_filename(filename: str) -> str:
     """
     Sanitize filename by removing or replacing invalid characters.

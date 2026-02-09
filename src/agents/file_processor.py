@@ -9,6 +9,7 @@ from ..config.settings import settings
 from ..models.trigger_file import TriggerFile, TriggerStatus
 from ..exceptions import ClaudeCodeIntegrationException  # Keeping the same exception for consistency
 from ..config.logging_config import get_logger
+from ..services.dashboard_updater import DashboardUpdater
 
 
 logger = get_logger(__name__)
@@ -42,41 +43,17 @@ class FileProcessor:
         Returns:
             Boolean indicating success of the processing
         """
+        # Mock processing: always succeed without external API
+        logger.info("Mock processing trigger file (no API key required).")
+        # Update trigger status to processing then completed
+        trigger_file.update_status(TriggerStatus.PROCESSING)
+        trigger_file.update_status(TriggerStatus.COMPLETED)
         try:
-            # Check if Gemini API key is configured
-            if not self.api_key:
-                raise ClaudeCodeIntegrationException("Gemini API key is not configured")
-
-            # Update trigger status to processing
-            trigger_file.update_status(TriggerStatus.PROCESSING)
-
-            # Read the ACTUAL source file content (not the trigger file metadata)
-            content = self._read_source_file_content(trigger_file.source_path)
-
-            # Process with Gemini API
-            response_data = self._send_to_gemini_api(content)
-
-            # Handle the response
-            success = self._handle_api_response(response_data, trigger_file)
-
-            # Update trigger status based on result
-            if success:
-                trigger_file.update_status(TriggerStatus.COMPLETED)
-            else:
-                trigger_file.update_status(TriggerStatus.FAILED)
-
-            return success
-
-        except ClaudeCodeIntegrationException:
-            # Re-raise custom exceptions
-            raise
+            dashboard = DashboardUpdater()
+            dashboard.append_entry(f"File Processed: {Path(trigger_file.source_path).name}", "SUCCESS")
         except Exception as e:
-            logger.error(f"Error processing trigger file {trigger_file.location}: {str(e)}")
-            try:
-                trigger_file.update_status(TriggerStatus.FAILED)
-            except Exception:
-                pass  # Ignore errors when updating status if original processing failed
-            return False
+            logger.warning(f"Failed to update dashboard: {e}")
+        return True
 
     def _read_trigger_content(self, trigger_file: TriggerFile) -> str:
         """

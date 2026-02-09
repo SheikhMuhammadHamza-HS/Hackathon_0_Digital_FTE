@@ -32,6 +32,8 @@ class TestSetupFunctionality(unittest.TestCase):
         settings.LOGS_PATH = self.test_dir / "Logs"
         settings.DASHBOARD_PATH = self.test_dir / "Dashboard.md"
         settings.COMPANY_HANDBOOK_PATH = self.test_dir / "Company_Handbook.md"
+        settings.CLAUDE_CODE_API_KEY = "test-claude-key"
+        settings.GEMINI_API_KEY = "test-gemini-key"
 
     def tearDown(self):
         """Clean up test environment."""
@@ -42,6 +44,8 @@ class TestSetupFunctionality(unittest.TestCase):
         settings.LOGS_PATH = self.original_logs
         settings.DASHBOARD_PATH = self.original_dashboard
         settings.COMPANY_HANDBOOK_PATH = self.original_handbook
+        settings.GEMINI_API_KEY = ""
+        settings.CLAUDE_CODE_API_KEY = ""
 
         # Remove test directory
         shutil.rmtree(self.test_dir, ignore_errors=True)

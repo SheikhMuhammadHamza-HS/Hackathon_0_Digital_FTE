@@ -75,6 +75,7 @@ class TriggerFile:
             String content for the trigger file
         """
         yaml_frontmatter = f"""---
+id: "{self.id}"
 type: "{self.type}"
 source_path: "{self.source_path}"
 timestamp: "{self.timestamp.isoformat()}"

@@ -51,9 +51,9 @@ class FileWatchHandler(FileSystemEventHandler):
             file_size_limit: Maximum file size allowed
             max_retry_attempts: Maximum number of retry attempts for failed processing
         """
-        self.needs_action_path = needs_action_path
-        self.done_path = done_path
-        self.dashboard_path = dashboard_path
+        self.needs_action_path = Path(needs_action_path)
+        self.done_path = Path(done_path)
+        self.dashboard_path = Path(dashboard_path)
         self.file_size_limit = file_size_limit
         self.max_retry_attempts = max_retry_attempts
         self.file_processor = FileProcessor()
@@ -241,8 +241,40 @@ class FileWatcher:
         # Schedule the event handler
         self.observer.schedule(self.handler, str(self.watch_path), recursive=False)
 
+        # Process any existing files present at start
+        for existing_file in Path(self.watch_path).iterdir():
+            if existing_file.is_file():
+                class DummyEvent:
+                    def __init__(self, path):
+                        self.src_path = str(path)
+                        self.is_directory = False
+                self.handler.on_created(DummyEvent(existing_file))
+
+        # Process any existing files in the watch directory before starting observer
+        if Path(self.watch_path).exists():
+            for existing_path in Path(self.watch_path).iterdir():
+                if existing_path.is_file():
+                    class SimpleEvent:
+                        def __init__(self, src_path):
+                            self.src_path = str(src_path)
+                            self.is_directory = False
+                    event = SimpleEvent(existing_path)
+                    self.handler.on_created(event)
+        # Process any existing files in the watch directory before starting observer
+        if Path(self.watch_path).exists():
+            for existing_path in Path(self.watch_path).iterdir():
+                if existing_path.is_file():
+                    class SimpleEvent:
+                        def __init__(self, src_path):
+                            self.src_path = str(src_path)
+                            self.is_directory = False
+                    event = SimpleEvent(existing_path)
+                    self.handler.on_created(event)
         # Start the observer
-        self.observer.start()
+        try:
+            self.observer.start()
+        except FileNotFoundError:
+            logger.warning(f"Watch path {self.watch_path} not found; observer not started.")
         self.running = True
 
         logger.info(f"Started watching directory: {self.watch_path}")

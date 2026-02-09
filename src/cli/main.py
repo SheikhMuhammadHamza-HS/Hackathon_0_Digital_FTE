@@ -11,6 +11,9 @@ from ..services.file_mover import FileMover
 from ..services.trigger_generator import TriggerGenerator
 from ..models.agent_state import AgentStateManager, AgentStatus
 from ..watchers.filesystem_watcher import FileWatcher
+from ..watchers.gmail_watcher import GmailWatcher
+from ..watchers.approval_watcher import ApprovalWatcher
+from ..services.scheduler import Scheduler
 from ..utils.file_utils import ensure_directory_exists
 from ..config.logging_config import get_logger
 
@@ -20,9 +23,10 @@ logger = get_logger(__name__)
 class AgentCLI:
     """Command-line interface for the agent."""
 
-    def __init__(self):
+    def __init__(self, state_file: Optional[str] = None):
         self.watcher: Optional[FileWatcher] = None
-        self.agent_state_manager = AgentStateManager()
+        state_file_path = state_file or settings.AGENT_STATE_PATH
+        self.agent_state_manager = AgentStateManager(state_file_path)
         self.running = False
 
     def setup(self, args):
@@ -79,7 +83,7 @@ class AgentCLI:
         return True
 
     def start(self, args):
-        """Start the agent to begin monitoring."""
+        """Start the agent to begin monitoring Gmail and local files."""
         if self.running:
             print("Agent is already running.")
             return
@@ -88,6 +92,16 @@ class AgentCLI:
 
         # Update agent state
         self.agent_state_manager.update_status(AgentStatus.MONITORING)
+
+        # Initialise Gmail watcher (runs in background thread)
+        try:
+            gmail_watcher = GmailWatcher()
+            gmail_thread = threading.Thread(target=gmail_watcher.start, daemon=True)
+            gmail_thread.start()
+            print("Gmail watcher started in background thread.")
+        except Exception as e:
+            logger.error(f"Failed to start Gmail watcher: {str(e)}")
+            print(f"Failed to start Gmail watcher: {str(e)}")
 
         # Create and start the file watcher
         try:
@@ -102,7 +116,7 @@ class AgentCLI:
 
             self.running = True
             print("Agent started successfully. Monitoring for new files...")
-            
+
             # Start the watcher (this blocks)
             try:
                 self.watcher.start_watching()
@@ -117,63 +131,48 @@ class AgentCLI:
             print(f"Error starting agent: {str(e)}")
             return False
 
+    def schedule_run(self, args):
+        """Execute scheduled LinkedIn draft jobs.
+
+        If ``--once`` is provided, run pending jobs once and exit.
+        Otherwise, start the background scheduler thread.
+        """
+        scheduler = Scheduler()
+        if getattr(args, 'once', False):
+            print("Running scheduled jobs once...")
+            scheduler.run_once()
+            print('Scheduled jobs executed once.')
+        else:
+            print('Starting scheduler (background thread)...')
+            scheduler.start()
+            print('Scheduler started in background. Press Ctrl+C to stop.')
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                print('Scheduler stopped by user.')
+
     def stop(self, args):
         """Stop the agent gracefully."""
         if not self.running:
+            print("Agent is not running.")
             return
-
         print("\nStopping agent...")
         self.running = False
-
         if self.watcher:
             try:
                 self.watcher.stop_watching()
             except Exception as e:
-                logger.error(f"Error stopping watcher: {str(e)}")
-
-        # Update agent state
+                logger.error(f"Error stopping watcher: {e}")
         try:
             self.agent_state_manager.update_status(AgentStatus.IDLE)
         except Exception:
             pass
-
         print("Agent stopped.")
 
     def start_with_graceful_shutdown(self, args):
         """Start the agent with ability to gracefully handle shutdown."""
         self.start(args)
-
-    def process_trigger(self, args):
-        """Manually process a specific trigger file."""
-        if not hasattr(args, 'trigger_file_path') or not args.trigger_file_path:
-            print("Error: Please specify a trigger file path with --trigger-file-path")
-            return
-
-        print(f"Manually processing trigger file: {args.trigger_file_path}")
-
-        # This functionality would require loading and processing a specific trigger file
-        # Implementation would connect to Claude Code for processing
-        from ..services.trigger_generator import TriggerGenerator
-        from ..agents.file_processor import FileProcessor
-
-        # Load the trigger file
-        trigger_file = TriggerGenerator.load_trigger_from_file(args.trigger_file_path)
-
-        if not trigger_file:
-            print(f"Error: Could not load trigger file: {args.trigger_file_path}")
-            return
-
-        # Process the trigger file
-        processor = FileProcessor()
-        success = processor.process_file_with_exponential_backoff(
-            trigger_file,
-            max_attempts=settings.MAX_RETRY_ATTEMPTS
-        )
-
-        if success:
-            print(f"Successfully processed trigger file: {args.trigger_file_path}")
-        else:
-            print(f"Failed to process trigger file: {args.trigger_file_path}")
 
     def status(self, args):
         """Show current agent status."""
@@ -195,10 +194,25 @@ class AgentCLI:
 
         print(f"Manually processing trigger file: {args.trigger_file_path}")
 
-        # This would require the agents module which hasn't been implemented yet
-        # For now, just indicate that the functionality exists conceptually
-        print("Manual trigger processing is part of the agent's core functionality.")
-        print("This feature connects to Claude Code for processing.")
+        from ..services.trigger_generator import TriggerGenerator
+        from ..agents.file_processor import FileProcessor
+
+        trigger_file = TriggerGenerator.load_trigger_from_file(args.trigger_file_path)
+
+        if not trigger_file:
+            print(f"Error: Could not load trigger file: {args.trigger_file_path}")
+            return
+
+        processor = FileProcessor()
+        success = processor.process_file_with_exponential_backoff(
+            trigger_file,
+            max_attempts=settings.MAX_RETRY_ATTEMPTS
+        )
+
+        if success:
+            print(f"Successfully processed trigger file: {args.trigger_file_path}")
+        else:
+            print(f"Failed to process trigger file: {args.trigger_file_path}")
 
 
 def main():
@@ -220,11 +234,17 @@ def main():
     stop_parser = subparsers.add_parser("stop", help="Stop the agent")
     stop_parser.set_defaults(func=cli.stop)
 
-    # Status command
     status_parser = subparsers.add_parser("status", help="Show agent status")
     status_parser.set_defaults(func=cli.status)
 
-    # Process trigger command
+    # Schedule run command
+    schedule_parser = subparsers.add_parser("schedule-run", help="Run scheduled jobs (LinkedIn drafts) now or start scheduler")
+    schedule_parser.add_argument("--once", action="store_true", help="Execute pending jobs once and exit (useful for testing)")
+    schedule_parser.set_defaults(func=cli.schedule_run)
+
+    # Approval watch command (new)
+    approval_parser = subparsers.add_parser("approval-watch", help="Watch Approved folder and execute drafts")
+    approval_parser.set_defaults(func=lambda args: ApprovalWatcher().start())
     process_trigger_parser = subparsers.add_parser("process-trigger", help="Manually process a trigger file")
     process_trigger_parser.add_argument("--trigger-file-path", type=str, help="Path to the trigger file to process")
     process_trigger_parser.set_defaults(func=cli.process_trigger)
