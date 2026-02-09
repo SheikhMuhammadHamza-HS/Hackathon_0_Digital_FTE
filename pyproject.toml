@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "personal-ai-employee"
+version = "0.1.0"
+description = "Personal AI Employee for Silver Tier"
+authors = ["Your Name <you@example.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+schedule = "*"
+python-dotenv = "*"
+google-generativeai = "*"
+mistune = "*"
+
+[tool.poetry.dev-dependencies]
+pytest = "*"
+ruff = "*"
+black = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+python_files = "test_*.py"

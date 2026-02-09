@@ -63,13 +63,13 @@ class DashboardEntry:
             String representation as markdown table row
         """
         time_str = self.timestamp.strftime("%H:%M")
-        duration_str = f" ({self.duration:.1f}s)" if self.duration else ""
-
+        duration_str = f" ({self.duration:.1f}s)" if self.duration is not None else ""
+        file_type_str = f" {self.file_type}" if self.file_type else ""
         # Clean the display name to avoid breaking the markdown table
         safe_display_name = self.display_name.replace('|', '/')
         safe_status = self.status.replace('|', '/')
+        return f"| {time_str} | {safe_display_name}{duration_str}{file_type_str} | {safe_status} |"
 
-        return f"| {time_str} | {safe_display_name}{duration_str} | {safe_status} |"
 
     def to_dict(self) -> dict:
         """

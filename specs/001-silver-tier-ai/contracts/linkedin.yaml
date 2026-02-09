@@ -1,0 +1,27 @@
+openapi: 3.0.0
+info:
+  title: LinkedIn Post API
+  version: '1.0'
+paths:
+  /posts:
+    post:
+      summary: Create a LinkedIn post draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                task_id:
+                  type: string
+                content:
+                  type: string
+              required:
+                - task_id
+                - content
+      responses:
+        '201':
+          description: Draft created
+        '400':
+          description: Invalid input

@@ -1,0 +1,33 @@
+openapi: 3.0.0
+info:
+  title: Email Draft API
+  version: '1.0'
+paths:
+  /drafts:
+    post:
+      summary: Create an email draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                task_id:
+                  type: string
+                subject:
+                  type: string
+                body:
+                  type: string
+                recipient:
+                  type: string
+              required:
+                - task_id
+                - subject
+                - body
+                - recipient
+      responses:
+        '201':
+          description: Draft created
+        '400':
+          description: Invalid input

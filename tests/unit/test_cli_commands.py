@@ -26,6 +26,7 @@ class TestCLICommands(unittest.TestCase):
         self.original_dashboard = settings.DASHBOARD_PATH
         self.original_handbook = settings.COMPANY_HANDBOOK_PATH
         self.original_api_key = settings.CLAUDE_CODE_API_KEY
+        self.original_gemini_key = getattr(settings, 'GEMINI_API_KEY', '')
 
         # Set settings to test paths
         settings.INBOX_PATH = self.test_dir / "Inbox"
@@ -35,6 +36,7 @@ class TestCLICommands(unittest.TestCase):
         settings.DASHBOARD_PATH = self.test_dir / "Dashboard.md"
         settings.COMPANY_HANDBOOK_PATH = self.test_dir / "Company_Handbook.md"
         settings.CLAUDE_CODE_API_KEY = "test-api-key"
+        settings.GEMINI_API_KEY = "test-gemini-key"
 
     def tearDown(self):
         """Clean up test environment."""
@@ -46,13 +48,14 @@ class TestCLICommands(unittest.TestCase):
         settings.DASHBOARD_PATH = self.original_dashboard
         settings.COMPANY_HANDBOOK_PATH = self.original_handbook
         settings.CLAUDE_CODE_API_KEY = self.original_api_key
+        settings.GEMINI_API_KEY = self.original_gemini_key
 
         # Remove test directory
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_cli_initialization(self):
         """Test that AgentCLI initializes correctly."""
-        cli = AgentCLI()
+        cli = AgentCLI(str(self.test_dir / "agent_state.json"))
 
         self.assertIsNotNone(cli)
         self.assertIsNone(cli.watcher)
@@ -61,7 +64,7 @@ class TestCLICommands(unittest.TestCase):
 
     def test_setup_command(self):
         """Test the setup command functionality."""
-        cli = AgentCLI()
+        cli = AgentCLI(str(self.test_dir / "agent_state.json"))
 
         # Create args object
         class Args:
@@ -86,7 +89,7 @@ class TestCLICommands(unittest.TestCase):
 
     def test_status_command(self):
         """Test the status command."""
-        cli = AgentCLI()
+        cli = AgentCLI(str(self.test_dir / "agent_state.json"))
 
         # Create args object
         class Args:
@@ -116,7 +119,7 @@ class TestCLICommands(unittest.TestCase):
 
     def test_state_management(self):
         """Test that agent state is managed correctly."""
-        cli = AgentCLI()
+        cli = AgentCLI(str(self.test_dir / "agent_state.json"))
 
         # Get the initial state
         initial_state = cli.agent_state_manager.get_state()
@@ -140,7 +143,7 @@ class TestCLICommands(unittest.TestCase):
 
     def test_stop_command_when_not_running(self):
         """Test the stop command when agent is not running."""
-        cli = AgentCLI()
+        cli = AgentCLI(str(self.test_dir / "agent_state.json"))
 
         # Ensure agent is not running
         cli.running = False
@@ -169,7 +172,7 @@ class TestCLICommands(unittest.TestCase):
 
     def test_start_command_when_already_running(self):
         """Test the start command when agent is already running."""
-        cli = AgentCLI()
+        cli = AgentCLI(str(self.test_dir / "agent_state.json"))
 
         # Set agent to running state
         cli.running = True
@@ -198,7 +201,7 @@ class TestCLICommands(unittest.TestCase):
 
     def test_process_trigger_command_without_args(self):
         """Test the process-trigger command without required arguments."""
-        cli = AgentCLI()
+        cli = AgentCLI(str(self.test_dir / "agent_state.json"))
 
         # Create args object without trigger_file_path
         class Args:
@@ -224,7 +227,7 @@ class TestCLICommands(unittest.TestCase):
 
     def test_configuration_validation_in_setup(self):
         """Test that configuration validation works in setup command."""
-        cli = AgentCLI()
+        cli = AgentCLI(str(self.test_dir / "agent_state.json"))
 
         # Temporarily set an invalid API key to test validation
         original_api_key = settings.CLAUDE_CODE_API_KEY
@@ -326,11 +329,11 @@ class TestCLIArgumentParsing(unittest.TestCase):
             process_trigger_parser.set_defaults(func=lambda args: print("Process trigger called"))
 
             # Verify parsers were added
-            self.assertIn("setup", {action.dest for action in subparsers._actions if hasattr(action, 'dest')})
-            self.assertIn("start", {action.dest for action in subparsers._actions if hasattr(action, 'dest')})
-            self.assertIn("stop", {action.dest for action in subparsers._actions if hasattr(action, 'dest')})
-            self.assertIn("status", {action.dest for action in subparsers._actions if hasattr(action, 'dest')})
-            self.assertIn("process-trigger", {action.dest for action in subparsers._actions if hasattr(action, 'dest')})
+            self.assertIn("setup", subparsers.choices)
+            self.assertIn("start", subparsers.choices)
+            self.assertIn("stop", subparsers.choices)
+            self.assertIn("status", subparsers.choices)
+            self.assertIn("process-trigger", subparsers.choices)
 
         finally:
             sys.stdout = sys.__stdout__
