@@ -1,0 +1,59 @@
+{
+    "mcpServers": {
+        "google-workspace": {
+            "command": "uvx",
+            "args": [
+                "workspace-mcp",
+                "--tools",
+                "gmail",
+                "calendar",
+                "--single-user"
+            ]
+        },
+        "whatsapp": {
+            "command": "uv",
+            "args": [
+                "--directory",
+                "d:/hackathon_zero/src/mcp/whatsapp-mcp-server",
+                "run",
+                "main.py"
+            ],
+            "env": {}
+        },
+        "linkedin": {
+            "command": "uv",
+            "args": [
+                "--directory",
+                "d:/hackathon_zero/src/mcp/linkedin-mcp",
+                "run",
+                "python",
+                "main.py",
+                "--stdio"
+            ]
+        },
+        "x": {
+            "command": "node",
+            "args": [
+                "D:/path/to/x-mcp-server/build/index.js"
+            ],
+            "env": {
+                "TWITTER_API_KEY": "",
+                "TWITTER_API_SECRET": "",
+                "TWITTER_ACCESS_TOKEN": "",
+                "TWITTER_ACCESS_SECRET": ""
+            }
+        },
+        "odoo": {
+            "command": "python",
+            "args": [
+                "-m",
+                "claude_odoo_api"
+            ],
+            "env": {
+                "ODOO_URL": "http://localhost:8069",
+                "ODOO_DB": "odoo",
+                "ODOO_API_KEY": "your_api_key_here"
+            }
+        }
+    }
+}
