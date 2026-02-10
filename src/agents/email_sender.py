@@ -98,9 +98,11 @@ class EmailSender:
             raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
             
             # Send the message
+            print(f"DEBUG: Attempting to send email to {to_addr} via Gmail API...")
             self.service.users().messages().send(userId='me', body={'raw': raw_message}).execute()
             
             logger.info("Successfully sent email to %s", to_addr)
+            print(f"DONE: Email successfully sent to {to_addr}!")
             return True
         except Exception as e:
             logger.error("Failed to send email draft %s: %s", draft_path, e)
