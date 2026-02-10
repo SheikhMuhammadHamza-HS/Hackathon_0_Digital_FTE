@@ -119,3 +119,7 @@ Done/
 Logs/
 Dashboard.md
 *.tmp
+
+# Secrets
+token.json
+credentials.json

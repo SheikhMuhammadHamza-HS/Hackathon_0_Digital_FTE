@@ -93,15 +93,20 @@ class AgentCLI:
         # Update agent state
         self.agent_state_manager.update_status(AgentStatus.MONITORING)
 
-        # Initialise Gmail watcher (runs in background thread)
+        # Initialise Gmail and Approval watchers (run in background threads)
         try:
             gmail_watcher = GmailWatcher()
             gmail_thread = threading.Thread(target=gmail_watcher.start, daemon=True)
             gmail_thread.start()
             print("Gmail watcher started in background thread.")
+
+            approval_watcher = ApprovalWatcher()
+            approval_thread = threading.Thread(target=approval_watcher.start, daemon=True)
+            approval_thread.start()
+            print("Approval watcher started in background thread.")
         except Exception as e:
-            logger.error(f"Failed to start Gmail watcher: {str(e)}")
-            print(f"Failed to start Gmail watcher: {str(e)}")
+            logger.error(f"Failed to start background watchers: {str(e)}")
+            print(f"Failed to start background watchers: {str(e)}")
 
         # Create and start the file watcher
         try:

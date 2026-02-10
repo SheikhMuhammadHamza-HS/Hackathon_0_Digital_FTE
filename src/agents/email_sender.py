@@ -19,43 +19,88 @@ class EmailSender:
     """
 
     def __init__(self):
-        self.api_key = getattr(settings, "GMAIL_API_KEY", "")
-        if self.api_key:
-            logger.info("EmailSender configured with real Gmail API key")
-        else:
-            logger.warning("No Gmail API key present – EmailSender will operate in mock mode")
+        self.creds = self._load_credentials()
+        try:
+            from googleapiclient.discovery import build
+            self.service = build('gmail', 'v1', credentials=self.creds)
+            logger.info("EmailSender configured with Gmail API")
+        except Exception as e:
+            logger.error(f"Failed to initialize Gmail API service: {e}")
+            self.service = None
+
+    def _load_credentials(self):
+        """Load Gmail OAuth2 credentials from settings."""
+        from google.oauth2.credentials import Credentials
+        # Check for direct TOKEN string (authorized_user_info format)
+        token_info = None
+        if settings.GMAIL_TOKEN:
+             import json
+             try:
+                 token_info = json.loads(settings.GMAIL_TOKEN)
+             except Exception:
+                 logger.error("GMAIL_TOKEN is not a valid JSON string")
+        
+        if token_info:
+            return Credentials.from_authorized_user_info(token_info)
+            
+        # Fallback: check for token.json file in root
+        token_file = Path("token.json")
+        if token_file.exists():
+            from ..watchers.gmail_watcher import SCOPES
+            return Credentials.from_authorized_user_file(str(token_file), SCOPES)
+
+        return None
 
     def send_draft(self, draft_path: Path) -> bool:
-        """Send the draft file.
-
-        Parameters
-        ----------
-        draft_path: Path
-            Absolute path to a markdown draft stored in ``settings.PENDING_APPROVAL_PATH``.
-
-        Returns
-        -------
-        bool
-            ``True`` on successful send (or mock send), ``False`` otherwise.
-        """
+        """Send the draft file via Gmail API."""
         try:
+            if not self.service:
+                logger.error("Gmail service not initialized. Cannot send email.")
+                return False
+
             # Safety: ensure the draft lives inside the approved base directory
             base_dir = Path(settings.APPROVED_PATH)
             if not is_safe_path(draft_path, base_dir):
                 logger.error("Unsafe draft path detected: %s", draft_path)
                 return False
 
-            # Read the file (the DraftStore already guarantees the Platform header is "email")
+            # Read the file
             content = draft_path.read_text(encoding="utf-8")
-            logger.debug("Email draft content (first 200 chars): %s", content[:200])
+            
+            # Extract headers and body
+            subject = "No Subject"
+            to_addr = ""
+            body = []
+            
+            lines = content.splitlines()
+            header_done = False
+            for line in lines:
+                if not header_done:
+                    if line.lower().startswith("subject:"):
+                        subject = line.split(":", 1)[1].strip()
+                    elif line.lower().startswith("to:"):
+                        to_addr = line.split(":", 1)[1].strip()
+                    elif not line.strip():
+                        header_done = True
+                else:
+                    body.append(line)
 
-            if self.api_key:
-                # Real implementation would call Gmail API here.
-                # For the purposes of this repository we simply log the action.
-                logger.info("Sending email via Gmail API (mocked – real call omitted)")
-            else:
-                logger.info("Mock email send – no API key configured")
+            full_body = "\n".join(body)
 
+            # Create MIME message
+            import base64
+            from email.mime.text import MIMEText
+            
+            message = MIMEText(full_body)
+            message['to'] = to_addr
+            message['subject'] = subject
+            
+            raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+            
+            # Send the message
+            self.service.users().messages().send(userId='me', body={'raw': raw_message}).execute()
+            
+            logger.info("Successfully sent email to %s", to_addr)
             return True
         except Exception as e:
             logger.error("Failed to send email draft %s: %s", draft_path, e)

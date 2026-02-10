@@ -83,9 +83,8 @@ class FileMover:
         results = {}
         for directory in directories:
             try:
-                path = Path(directory)
-                path.mkdir(parents=True, exist_ok=True)
-                results[str(path)] = True
+                os.makedirs(str(directory), exist_ok=True)
+                results[str(directory)] = True
             except Exception as e:
                 print(f"Error creating directory {directory}: {str(e)}")
                 results[str(directory)] = False

@@ -29,6 +29,11 @@ class Settings:
         self.COMPANY_HANDBOOK_PATH: str = os.getenv("COMPANY_HANDBOOK_PATH", "./Company_Handbook.md")
         self.AGENT_STATE_PATH: str = os.getenv("AGENT_STATE_PATH", "./agent_state.json")
 
+        # Gmail OAuth settings
+        self.GMAIL_TOKEN: str = os.getenv("GMAIL_TOKEN", "")
+        self.GMAIL_CLIENT_ID: str = os.getenv("GMAIL_CLIENT_ID", "")
+        self.GMAIL_CLIENT_SECRET: str = os.getenv("GMAIL_CLIENT_SECRET", "")
+
         # Operational limits
         self.FILE_SIZE_LIMIT: int = int(os.getenv("FILE_SIZE_LIMIT", "10485760"))  # 10 MiB
         self.MAX_RETRY_ATTEMPTS: int = int(os.getenv("MAX_RETRY_ATTEMPTS", "3"))
