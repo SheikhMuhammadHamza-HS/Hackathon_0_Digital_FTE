@@ -34,6 +34,12 @@ class Settings:
         self.GMAIL_CLIENT_ID: str = os.getenv("GMAIL_CLIENT_ID", "")
         self.GMAIL_CLIENT_SECRET: str = os.getenv("GMAIL_CLIENT_SECRET", "")
 
+        # X (Twitter) settings
+        self.X_API_KEY: str = os.getenv("X_API_KEY", "")
+        self.X_API_SECRET: str = os.getenv("X_API_SECRET", "")
+        self.X_ACCESS_TOKEN: str = os.getenv("X_ACCESS_TOKEN", "")
+        self.X_ACCESS_SECRET: str = os.getenv("X_ACCESS_SECRET", "")
+
         # Operational limits
         self.FILE_SIZE_LIMIT: int = int(os.getenv("FILE_SIZE_LIMIT", "10485760"))  # 10 MiB
         self.MAX_RETRY_ATTEMPTS: int = int(os.getenv("MAX_RETRY_ATTEMPTS", "3"))
@@ -86,3 +92,9 @@ COMPANY_HANDBOOK_PATH = settings.COMPANY_HANDBOOK_PATH
 FILE_SIZE_LIMIT = settings.FILE_SIZE_LIMIT
 MAX_RETRY_ATTEMPTS = settings.MAX_RETRY_ATTEMPTS
 FILE_DETECTION_LATENCY = settings.FILE_DETECTION_LATENCY
+
+# X (Twitter) Settings
+X_API_KEY = settings.X_API_KEY
+X_API_SECRET = settings.X_API_SECRET
+X_ACCESS_TOKEN = settings.X_ACCESS_TOKEN
+X_ACCESS_SECRET = settings.X_ACCESS_SECRET

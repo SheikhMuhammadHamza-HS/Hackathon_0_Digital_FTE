@@ -51,12 +51,7 @@ class ApprovalWatcher:
             target_dir = self.done_dir if success else self.failed_dir
             dest_path = target_dir / file_path.name
             FileMover.move_file(file_path, dest_path)
-            logger.info("Draft %s moved to %s", file_path.name, target_dir)
-
-            # Record the action in the dashboard.
-            action_desc = "Email" if "email" in file_path.name.lower() else "LinkedIn"
-            result = "SUCCESS" if success else "FAILURE"
-            self.dashboard.append_entry(f"{action_desc} draft sent", result)
+            logger.info("Draft %s processed and moved to %s", file_path.name, target_dir)
         except Exception as e:
             logger.error("Error processing approved draft %s: %s", file_path, e)
 
