@@ -58,11 +58,14 @@ class EmailProcessor:
         trigger_content = self._read_trigger_content(trigger_file)
 
         # Build a concise prompt for Gemini
+        is_gmail = "GMAIL_" in trigger_file.location
+        context_type = "Gmail reply" if is_gmail else "general email"
+        
         prompt = (
-            "Generate an email draft based on the following trigger content, "
-            "taking into account the company handbook guidance.\n\n"
+            f"Generate a professional {context_type} draft based on the following content, "
+            "following the company handbook rules.\n\n"
             f"Handbook:\n{handbook_text}\n\n"
-            f"Trigger Content:\n{trigger_content}"
+            f"Original Content:\n{trigger_content}"
         )
 
         # Send to Gemini (or mock) and handle the response
@@ -78,6 +81,10 @@ class EmailProcessor:
 
         # Extract Subject and To from trigger content (fallback defaults)
         subject, to_addr = self._extract_headers(trigger_content)
+        # For Gmail tasks, clean up subject
+        if is_gmail and not subject.startswith("Re:"):
+            subject = f"Re: {subject}"
+
         # Persist the draft using DraftStore
         try:
             from ..services.draft_store import DraftStore
@@ -93,18 +100,32 @@ class EmailProcessor:
         return True
 
     def _extract_headers(self, content: str) -> tuple[str, str]:
-        """Very simple header extraction from trigger content.
-
-        Looks for lines starting with ``Subject:`` and ``To:`` (case‑insensitive).
-        If not found, returns placeholder values.
-        """
+        """Header extraction handling both raw text and YAML frontmatter."""
         subject = "No Subject"
         to_addr = "unknown@example.com"
-        for line in content.splitlines():
-            if line.lower().startswith('subject:'):
-                subject = line.split(':', 1)[1].strip()
-            elif line.lower().startswith('to:'):
-                to_addr = line.split(':', 1)[1].strip()
+        
+        # Check for YAML frontmatter first (for GMAIL tasks)
+        if content.startswith('---'):
+            try:
+                import yaml
+                parts = content.split('---', 2)
+                if len(parts) >= 3:
+                    meta = yaml.safe_load(parts[1])
+                    subject = meta.get('subject', subject)
+                    to_addr = meta.get('from', to_addr) # 'from' in task is person who sent us email
+            except Exception:
+                pass
+        
+        # Fallback to line scanning
+        if subject == "No Subject" or to_addr == "unknown@example.com":
+            for line in content.splitlines():
+                if line.lower().startswith('subject:'):
+                    subject = line.split(':', 1)[1].strip()
+                elif line.lower().startswith('to:'):
+                    to_addr = line.split(':', 1)[1].strip()
+                elif line.lower().startswith('from:'):
+                    to_addr = line.split(':', 1)[1].strip()
+                    
         return subject, to_addr
 
     def _read_trigger_content(self, trigger_file: TriggerFile) -> str:
@@ -132,7 +153,7 @@ class EmailProcessor:
                     "id": "gemini_response_id",
                     "content": [{"type": "text", "text": response.text or "Draft generated"}],
                     "role": "assistant",
-                    "model": "Gemini 2.5 Flash",
+                    "model": "gemini-2.5-flash",
                     "stop_reason": getattr(response, 'stop_reason', 'end_turn'),
                     "stop_sequence": None,
                     "usage": {
@@ -156,4 +177,7 @@ class EmailProcessor:
             logger.info(f"Gemini call took {elapsed:.2f}s")
             return response_data
         except Exception as e:
+            if "429" in str(e) or "quota" in str(e).lower():
+                logger.error(f"Gemini API Quota Exceeded: {e}. Try again in a few minutes or of next day.")
+                return None
             raise ClaudeCodeIntegrationException(f"Error communicating with Gemini API: {str(e)}")

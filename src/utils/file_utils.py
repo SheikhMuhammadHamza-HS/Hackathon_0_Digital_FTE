@@ -115,7 +115,7 @@ def ensure_directory_exists(directory: Path) -> bool:
         Boolean indicating if directory exists/is created
     """
     try:
-        directory.mkdir(parents=True, exist_ok=True)
+        Path(directory).mkdir(parents=True, exist_ok=True)
         return True
     except Exception as e:
         print(f"Error creating directory {directory}: {str(e)}")

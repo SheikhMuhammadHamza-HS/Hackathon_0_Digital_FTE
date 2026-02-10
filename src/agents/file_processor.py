@@ -28,7 +28,7 @@ class FileProcessor:
         if self.api_key and not is_placeholder:
             genai.configure(api_key=self.api_key)
             self.model = genai.GenerativeModel('gemini-2.5-flash')
-            logger.info("Claude API configured with model: Claude 4.5 Sonnet")
+            logger.info("Gemini API configured with model: gemini-2.5-flash")
         else:
             logger.warning("No API key configured (neither Gemini nor Claude). Processing will use mock responses.")
             self.model = None
@@ -110,7 +110,7 @@ class FileProcessor:
                     "id": "claude_response_id",
                     "content": [{"type": "text", "text": response.text if response.text else "Processing completed successfully"}],
                     "role": "assistant",
-                    "model": "Claude 4.5 Sonnet",
+                    "model": "gemini-2.5-flash",
                     "stop_reason": getattr(response, 'stop_reason', 'end_turn'),
                     "stop_sequence": None,
                     "usage": {
@@ -126,7 +126,7 @@ class FileProcessor:
                     "id": "mock_response_id",
                     "content": [{"type": "text", "text": "Processing completed successfully (mock response)"}],
                     "role": "assistant",
-                    "model": "Claude 4.5 Sonnet",
+                    "model": "gemini-2.5-flash",
                     "stop_reason": "end_turn",
                     "stop_sequence": None,
                     "usage": {

@@ -110,3 +110,10 @@
 - Different user stories can be worked on simultaneously by separate developers.
 - [X] T043 Update task file after recent changes (settings, file_processor, dashboard)
 - [X] T044 Finalize Silver Tier base implementation fixes and verify all tests pass
+- [X] T045 Integrated Gmail Automation <!-- id: 37 -->
+    - [X] Complete GmailWatcher credentials logic
+    - [X] Update Gmail polling for .eml metadata
+    - [X] Integrate Gmail triggers into FileWatcher/Orchestrator
+- [ ] T046 Integrated LinkedIn Automation Enhancements <!-- id: 38 -->
+    - [ ] Refine LinkedIn post drafting prompts
+    - [ ] Improve scheduler robustness
