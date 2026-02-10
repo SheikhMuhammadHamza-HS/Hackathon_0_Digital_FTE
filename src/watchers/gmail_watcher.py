@@ -65,7 +65,30 @@ class GmailWatcher:
         try:
             results = self.service.users().messages().list(userId='me', q='is:unread', maxResults=max_results).execute()
             messages = results.get('messages', [])
+            
+            # Debug heartbeat
+            print(f"GmailWatcher: Polled. Found {len(messages)} unread messages.")
+            
+            # Identify current account email
+            profile = self.service.users().getProfile(userId='me').execute()
+            print(f"DEBUG: Active Account Email: {profile.get('emailAddress')}")
+
             created_files = []
+
+            if len(messages) == 0:
+                # Extra debug: List last 3 messages regardless of status
+                recent = self.service.users().messages().list(userId='me', maxResults=3).execute()
+                rmsgs = recent.get('messages', [])
+                if rmsgs:
+                    print("DEBUG: Showing last 3 messages found in account (to verify connection):")
+                    for rm in rmsgs:
+                        m = self.service.users().messages().get(userId='me', id=rm['id']).execute()
+                        subj = next((h['value'] for h in m['payload']['headers'] if h['name'].lower() == 'subject'), 'No Subject')
+                        itime = m.get('internalDate', '0')
+                        dtime = datetime.fromtimestamp(int(itime)/1000.0).strftime('%Y-%m-%d %H:%M:%S')
+                        print(f"  - Subject: {subj} (Received: {dtime})")
+                else:
+                    print("DEBUG: LITERALLY NO EMAILS FOUND in this account.")
             
             for msg in messages:
                 msg_id = msg['id']
@@ -144,9 +167,12 @@ status: pending
         """Blocking loop for polling."""
         import time
         logger.info("Gmail watcher started.")
+        print("Gmail watcher: Monitoring started. Will check for new emails every 60 seconds.")
         while True:
             try:
+                print(f"DEBUG: Gmail polling at {datetime.now().strftime('%H:%M:%S')}...")
                 self.poll_unread()
             except Exception as e:
                 logger.error("Watcher loop error: %s", e)
+                print(f"ERROR: Gmail Watcher loop error: {e}")
             time.sleep(self.poll_interval)

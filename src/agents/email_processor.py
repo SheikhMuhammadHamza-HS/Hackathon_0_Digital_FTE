@@ -62,10 +62,16 @@ class EmailProcessor:
         context_type = "Gmail reply" if is_gmail else "general email"
         
         prompt = (
-            f"Generate a professional {context_type} draft based on the following content, "
-            "following the company handbook rules.\n\n"
-            f"Handbook:\n{handbook_text}\n\n"
-            f"Original Content:\n{trigger_content}"
+            f"You are a smart Digital FTE Agent. Your goal is to draft a high-quality {context_type}.\n\n"
+            "Instructions:\n"
+            "1. ANALYZE the 'Original Content' below. Determine the sender's intent (e.g., a greeting, a question, or a file submission).\n"
+            "2. DRAFT a response that directly addresses the sender's message as a human assistant would. DONT just give a generic 'I am a processor' message.\n"
+            "3. If the user sent a greeting, respond with a friendly personal greeting.\n"
+            "4. If the user asks about your capabilities or sends a file, use the 'Handbook' rules below to inform your answer correctly.\n"
+            "5. SIGN OFF as 'Hamza Digital FTE Agent' at the end of every response.\n"
+            "6. The tone should be helpful, professional, and intelligently conversational.\n\n"
+            f"Handbook (Operational Limits):\n{handbook_text}\n\n"
+            f"Original Content (Includes Email Headers and Body):\n{trigger_content}"
         )
 
         # Send to Gemini (or mock) and handle the response
