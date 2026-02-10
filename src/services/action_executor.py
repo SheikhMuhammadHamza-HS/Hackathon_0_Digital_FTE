@@ -4,6 +4,7 @@ from pathlib import Path
 from ..utils.file_utils import read_file_head
 from ..agents.email_sender import EmailSender
 from ..agents.linkedin_poster import LinkedInPoster
+from ..agents.x_poster import XPoster
 from ..services.dashboard_updater import DashboardUpdater
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ class ActionExecutor:
     def __init__(self):
         self.email_sender = EmailSender()
         self.linkedin_poster = LinkedInPoster()
+        self.x_poster = XPoster()
 
     def _extract_platform(self, draft_path: Path) -> str:
         """Return the platform value from the draft header.
@@ -52,6 +54,12 @@ class ActionExecutor:
             result = self.linkedin_poster.post_draft(draft_path)
             dashboard = DashboardUpdater()
             dashboard.append_entry("LinkedIn draft posted", "SUCCESS" if result else "FAILURE")
+            return result
+        elif platform in ["x", "twitter"]:
+            logger.info("Executing XPoster for %s", draft_path.name)
+            result = self.x_poster.post_draft(draft_path)
+            dashboard = DashboardUpdater()
+            dashboard.append_entry("X/Twitter draft posted", "SUCCESS" if result else "FAILURE")
             return result
         else:
             logger.error("Unsupported or missing platform in draft %s", draft_path)

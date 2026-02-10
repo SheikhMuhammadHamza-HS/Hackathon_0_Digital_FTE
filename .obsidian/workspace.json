@@ -182,6 +182,15 @@
   },
   "active": "609e1472ef07f736",
   "lastOpenFiles": [
+    "Approved/practice_X_post.md",
+    "practice_X_post.md",
+    "Done/PRACTICE_X_POST.md",
+    "Approved/PRACTICE_X_POST.md",
+    "Pending_Approval/PRACTICE_X_POST.md",
+    "Done/test_x_post.md",
+    "src/agents/__pycache__/x_poster.cpython-313.pyc",
+    "Approved/test_x_post.md",
+    "src/agents/x_poster.py",
     "Done/20260210T213312Z_Re__linkedin_request_aauto.md",
     "Approved/20260210T213312Z_Re__linkedin_request_aauto.md",
     "Pending_Approval/20260210T213312Z_Re__linkedin_request_aauto.md",
@@ -201,13 +210,6 @@
     "Pending_Approval/20260210T185432Z_Re__wonderful_day.md",
     "Needs_Action/GMAIL_19c48e71a3b36d01.md",
     "Pending_Approval/20260210T120314Z_Re__Delivery_Status_Notification__Failure_.md",
-    "Needs_Action/GMAIL_19c476ddb3e7fa5c.md",
-    "Pending_Approval/20260210T120255Z_Re__greet.md",
-    "Needs_Action/GMAIL_19c476e0b97b1f09.md",
-    "Done/20260210T115604Z_Re__greet_hamza.md",
-    "Done/20260209T203925Z_No_Subject.md",
-    "Approved/20260210T115604Z_Re__greet_hamza.md",
-    "Pending_Approval/20260210T115604Z_Re__greet_hamza.md",
     "Inbox/validation_test.txt",
     "scripts/check_needs_action_subjects.py",
     "scripts/check_latest_unread.py",
@@ -215,8 +217,6 @@
     "scripts/verify_gmail_watcher.py",
     "token.json",
     "credentials.json",
-    "credential.json",
-    "credential.json.json",
-    "credentials.json/credential.json.json"
+    "credential.json"
   ]
 }
