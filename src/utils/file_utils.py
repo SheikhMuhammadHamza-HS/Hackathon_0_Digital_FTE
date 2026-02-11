@@ -201,3 +201,28 @@ def sanitize_filename(filename: str) -> str:
         sanitized = name[:250] + ext
 
     return sanitized
+
+
+def extract_platform_header(file_path: Path) -> str | None:
+    """Extract the ``Platform:`` header from a markdown file.
+
+    The function reads the file, removes any leading YAML front‑matter (the block
+    delimited by ``---`` lines), then looks for a line that starts with
+    ``Platform:`` (case‑insensitive).  The value after the colon is stripped and
+    returned lower‑cased (e.g. ``"x"`` or ``"twitter"``).  If no such line is
+    found, ``None`` is returned.
+    """
+    try:
+        content = file_path.read_text(encoding="utf-8")
+    except Exception:
+        return None
+    # Strip YAML front‑matter if present
+    if content.startswith("---"):
+        # Find the closing delimiter
+        end = content.find("---", 3)
+        if end != -1:
+            content = content[end + 3 :]
+    for line in content.splitlines():
+        if line.lower().startswith("platform:"):
+            return line.split(":", 1)[1].strip().lower()
+    return None
