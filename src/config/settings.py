@@ -39,6 +39,8 @@ class Settings:
         self.X_API_SECRET: str = os.getenv("X_API_SECRET", "")
         self.X_ACCESS_TOKEN: str = os.getenv("X_ACCESS_TOKEN", "")
         self.X_ACCESS_SECRET: str = os.getenv("X_ACCESS_SECRET", "")
+        self.X_USERNAME: str = os.getenv("X_USERNAME", "")
+        self.X_PASSWORD: str = os.getenv("X_PASSWORD", "")
 
         # Operational limits
         self.FILE_SIZE_LIMIT: int = int(os.getenv("FILE_SIZE_LIMIT", "10485760"))  # 10 MiB
@@ -98,3 +100,5 @@ X_API_KEY = settings.X_API_KEY
 X_API_SECRET = settings.X_API_SECRET
 X_ACCESS_TOKEN = settings.X_ACCESS_TOKEN
 X_ACCESS_SECRET = settings.X_ACCESS_SECRET
+X_USERNAME = settings.X_USERNAME
+X_PASSWORD = settings.X_PASSWORD
