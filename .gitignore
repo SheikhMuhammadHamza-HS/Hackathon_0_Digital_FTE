@@ -123,4 +123,6 @@ Dashboard.md
 # Secrets
 token.json
 credentials.json
+.playwright_session/
 .playwright_session/state.json
+mcp.json

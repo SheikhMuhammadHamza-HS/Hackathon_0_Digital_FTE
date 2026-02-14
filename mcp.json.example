@@ -1,0 +1,73 @@
+{
+  "mcpServers": {
+    "email-mcp": {
+      "command": "node",
+      "args": [
+        "./mcp-servers/email-mcp/index.js"
+      ],
+      "env": {
+        "GMAIL_TOKEN": "your_gmail_token_here"
+      }
+    },
+    "browser-mcp": {
+      "command": "node",
+      "args": [
+        "./mcp-servers/browser-mcp/index.js"
+      ],
+      "env": {
+        "HEADLESS": "true"
+      }
+    },
+    "linkedin-mcp": {
+      "command": "node",
+      "args": [
+        "./mcp-servers/linkedin-mcp/index.js"
+      ],
+      "env": {
+        "LINKEDIN_ACCESS_TOKEN": "your_linkedin_token_here",
+        "LINKEDIN_USER_ID": "your_user_id_here"
+      }
+    },
+    "whatsapp-mcp": {
+      "command": "node",
+      "args": [
+        "./mcp-servers/whatsapp-mcp/index.js"
+      ],
+      "env": {
+        "WHATSAPP_PHONE_NUMBER_ID": "your_phone_id_here",
+        "WHATSAPP_ACCESS_TOKEN": "your_whatsapp_token_here"
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-playwright"
+      ]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/absolute/path/to/your/workspace"
+      ]
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-brave-search"
+      ],
+      "env": {
+        "BRAVE_API_KEY": "your_brave_api_key_here"
+      }
+    }
+  },
+  "toolCallingTimeout": 30000,
+  "maxRetries": 3,
+  "retryBackoffMs": 1000,
+  "enableLogging": true,
+  "logLevel": "info",
+  "version": "1.0.0"
+}

@@ -10,6 +10,8 @@ from ..models.trigger_file import TriggerFile, TriggerStatus
 from ..exceptions import ClaudeCodeIntegrationException  # Keeping the same exception for consistency
 from ..config.logging_config import get_logger
 from ..services.dashboard_updater import DashboardUpdater
+from ..services.planner import Planner
+from ..services.draft_store import DraftStore
 
 
 logger = get_logger(__name__)
@@ -22,7 +24,7 @@ class FileProcessor:
         """Initialize the file processor."""
         # Use Gemini API key if available, otherwise fall back to Claude Code API key for backward compatibility
         self.api_key = settings.GEMINI_API_KEY or settings.CLAUDE_CODE_API_KEY
-        
+
         # Check if API key is valid (not empty and not a placeholder)
         is_placeholder = self.api_key and self.api_key.startswith("your_")
         if self.api_key and not is_placeholder:
@@ -33,9 +35,19 @@ class FileProcessor:
             logger.warning("No API key configured (neither Gemini nor Claude). Processing will use mock responses.")
             self.model = None
 
+        # Initialize Planner for Plan.md generation
+        self.planner = Planner()
+        self.draft_store = DraftStore()
+
     def process_trigger_file(self, trigger_file: TriggerFile) -> bool:
         """
         Process a trigger file using Google Gemini API.
+
+        This method:
+        1. Reads the source file content
+        2. Generates a Plan.md file in /Plans directory
+        3. Processes the file with AI
+        4. Creates a draft in /Pending_Approval if action is required
 
         Args:
             trigger_file: Trigger file to process
@@ -43,17 +55,86 @@ class FileProcessor:
         Returns:
             Boolean indicating success of the processing
         """
-        # Mock processing: always succeed without external API
-        logger.info("Mock processing trigger file (no API key required).")
-        # Update trigger status to processing then completed
-        trigger_file.update_status(TriggerStatus.PROCESSING)
-        trigger_file.update_status(TriggerStatus.COMPLETED)
         try:
-            dashboard = DashboardUpdater()
-            dashboard.append_entry(f"File Processed: {Path(trigger_file.source_path).name}", "SUCCESS")
+            trigger_file.update_status(TriggerStatus.PROCESSING)
+            logger.info(f"Processing trigger file: {trigger_file.source_path}")
+
+            # Step 1: Read the source file content
+            source_path = Path(trigger_file.source_path)
+            file_content = self._read_source_file_content(str(source_path))
+            file_type = source_path.suffix[1:] if source_path.suffix else "txt"
+            file_name = source_path.name
+
+            # Step 2: Generate Plan.md before processing
+            logger.info("Generating Plan.md for file processing...")
+            task_description = f"Process {file_type} file: {file_name}"
+            context = {
+                "file_path": str(source_path),
+                "file_type": file_type,
+                "file_name": file_name,
+                "content_preview": file_content[:300] if len(file_content) > 300 else file_content
+            }
+
+            plan, plan_path = self.planner.create_and_save_plan(
+                task_type="file_processing",
+                task_description=task_description,
+                context=context
+            )
+            logger.info(f"Plan created and saved: {plan_path}")
+
+            # Step 3: Process the file with AI
+            logger.info("Processing file with AI...")
+            response_data = self._send_to_gemini_api(file_content)
+
+            ai_response = ""
+            if "content" in response_data and len(response_data["content"]) > 0:
+                ai_response = response_data["content"][0].get("text", "")
+
+            # Step 4: Determine if an action draft should be created
+            should_create_draft = self._should_create_draft(file_content, ai_response)
+
+            if should_create_draft and ai_response:
+                # Create a draft in /Pending_Approval
+                logger.info("Creating draft in Pending_Approval...")
+                draft_path = self.draft_store.save_draft(
+                    subject=f"Action Required: {file_name}",
+                    to_addr="system",
+                    body=ai_response,
+                    platform="file_action"
+                )
+                logger.info(f"Draft created: {draft_path}")
+
+                # Update dashboard
+                try:
+                    dashboard = DashboardUpdater()
+                    dashboard.append_entry(f"Draft created: {file_name}", "PENDING")
+                except Exception as e:
+                    logger.warning(f"Failed to update dashboard: {e}")
+            else:
+                # Append AI response to the original file
+                if ai_response:
+                    try:
+                        with open(trigger_file.source_path, 'a', encoding='utf-8') as f:
+                            f.write("\n\n--- AI Response ---\n")
+                            f.write(ai_response)
+                        logger.info(f"Appended AI response to {trigger_file.source_path}")
+                    except Exception as e:
+                        logger.warning(f"Could not append response to source file: {str(e)}")
+
+                # Update dashboard
+                try:
+                    dashboard = DashboardUpdater()
+                    dashboard.append_entry(f"File Processed: {file_name}", "SUCCESS")
+                except Exception as e:
+                    logger.warning(f"Failed to update dashboard: {e}")
+
+            trigger_file.update_status(TriggerStatus.COMPLETED)
+            return True
+
         except Exception as e:
-            logger.warning(f"Failed to update dashboard: {e}")
-        return True
+            logger.error(f"Error processing trigger file: {str(e)}")
+            trigger_file.update_status(TriggerStatus.FAILED)
+            return False
 
     def _read_trigger_content(self, trigger_file: TriggerFile) -> str:
         """
@@ -141,6 +222,9 @@ class FileProcessor:
             return response_data
 
         except Exception as e:
+            if "429" in str(e) or "quota" in str(e).lower():
+                logger.error(f"Gemini API Quota Exceeded: {e}")
+                return None
             raise ClaudeCodeIntegrationException(f"Error communicating with Gemini API: {str(e)}")
 
     def _handle_api_response(self, response_data: Dict[Any, Any], trigger_file: TriggerFile) -> bool:
@@ -247,3 +331,29 @@ class FileProcessor:
             "model": "Claude 4.5 Sonnet",
             "has_api_key": bool(self.api_key)
         }
+
+    def _should_create_draft(self, file_content: str, ai_response: str) -> bool:
+        """
+        Determine if a draft should be created in /Pending_Approval.
+
+        Creates a draft if:
+        1. The file content contains action keywords (send, post, publish, execute, etc.)
+        2. The AI response suggests an action
+
+        Args:
+            file_content: Original file content
+            ai_response: AI's response to the file
+
+        Returns:
+            True if a draft should be created for human approval
+        """
+        # Action keywords that indicate human approval is needed
+        action_keywords = [
+            "send", "post", "publish", "execute", "deploy", "run",
+            "email", "linkedin", "twitter", "whatsapp", "social media",
+            "action", "approval", "execute action", "draft"
+        ]
+
+        combined_text = (file_content + " " + ai_response).lower()
+
+        return any(keyword in combined_text for keyword in action_keywords)

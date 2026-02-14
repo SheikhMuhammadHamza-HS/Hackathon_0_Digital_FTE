@@ -10,6 +10,7 @@ from ..exceptions import ClaudeCodeIntegrationException
 from ..config.logging_config import get_logger
 
 from ..utils.handbook_loader import load_handbook
+from ..services.planner import Planner
 
 logger = get_logger(__name__)
 
@@ -33,6 +34,8 @@ class EmailProcessor:
         else:
             logger.warning("No valid API key – EmailProcessor will use mock responses")
             self.model = None
+        
+        self.planner = Planner()
 
     def process_trigger_file(self, trigger_file: TriggerFile) -> bool:
         """Generate an email draft from a trigger file.
@@ -61,6 +64,24 @@ class EmailProcessor:
         is_gmail = "GMAIL_" in trigger_file.location
         context_type = "Gmail reply" if is_gmail else "general email"
         
+        # Step 1.5: Generate Plan.md
+        logger.info("Generating Plan.md for email drafting...")
+        subject, to_addr = self._extract_headers(trigger_content)
+        
+        plan_context = {
+            "sender": to_addr,
+            "subject": subject,
+            "is_gmail": is_gmail,
+            "trigger_path": str(trigger_file.location)
+        }
+        
+        plan, plan_path = self.planner.create_and_save_plan(
+            task_type="email_draft",
+            task_description=f"Draft a response to {context_type} with subject: {subject}",
+            context=plan_context
+        )
+        logger.info(f"Plan created: {plan_path}")
+
         prompt = (
             f"You are a smart Digital FTE Agent. Your goal is to draft a high-quality {context_type}.\n\n"
             "Instructions:\n"

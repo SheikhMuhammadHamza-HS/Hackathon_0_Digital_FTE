@@ -61,6 +61,11 @@ class ActionExecutor:
             dashboard = DashboardUpdater()
             dashboard.append_entry("X/Twitter draft posted", "SUCCESS" if result else "FAILURE")
             return result
+        elif platform == "file_action":
+            logger.info("Executing file_action (logging only) for %s", draft_path.name)
+            dashboard = DashboardUpdater()
+            dashboard.append_entry(f"Action executed: {draft_path.name}", "SUCCESS")
+            return True
         else:
             logger.error("Unsupported or missing platform in draft %s", draft_path)
             return False
