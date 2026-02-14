@@ -39,40 +39,46 @@ def extract_section(markdown: str, heading: str) -> str:
         The heading title to extract (case‑insensitive).
     """
     if mistune:
-        parser = mistune.create_markdown(renderer=mistune.AstRenderer())
-        ast = parser(markdown)
-        collecting = False
-        lines = []
-        for token in ast:
-            if token['type'] == 'heading' and token['level'] == 2:
-                # Compare heading text without markdown formatting
-                current = token['children'][0]['text'].strip().lower()
-                collecting = current == heading.lower()
-                continue
-            if collecting:
-                if token['type'] == 'heading' and token['level'] <= 2:
-                    break
-                if token['type'] == 'paragraph':
-                    lines.append(token['children'][0]['text'])
-                elif token['type'] == 'list':
-                    for item in token['children']:
-                        lines.append(f"- {item['children'][0]['text']}")
-        return "\n".join(lines).strip()
-    else:
-        # Simple fallback: split by lines and look for headings
-        lines = []
-        collecting = False
-        for raw_line in markdown.splitlines():
-            stripped = raw_line.strip()
+        try:
+            # Try modern mistune API first
+            parser = mistune.create_markdown(renderer=mistune.AstRenderer())
+            ast = parser(markdown)
+            collecting = False
+            lines = []
+            for token in ast:
+                if token['type'] == 'heading' and token['level'] == 2:
+                    # Compare heading text without markdown formatting
+                    current = token['children'][0]['text'].strip().lower()
+                    collecting = current == heading.lower()
+                    continue
+                if collecting:
+                    if token['type'] == 'heading' and token['level'] <= 2:
+                        break
+                    if token['type'] == 'paragraph':
+                        lines.append(token['children'][0]['text'])
+                    elif token['type'] == 'list':
+                        for item in token['children']:
+                            lines.append(f"- {item['children'][0]['text']}")
+            return "\n".join(lines).strip()
+        except (AttributeError, TypeError):
+            # Fall back to simple parser if mistune API is incompatible
+            logger.warning("Mistune API incompatible, falling back to simple parser")
+            pass
+
+    # Simple fallback: split by lines and look for headings
+    lines = []
+    collecting = False
+    for raw_line in markdown.splitlines():
+        stripped = raw_line.strip()
+        if stripped.startswith('##'):
+            header = stripped.lstrip('#').strip().lower()
+            collecting = (header == heading.lower())
+            continue
+        if collecting:
             if stripped.startswith('##'):
-                header = stripped.lstrip('#').strip().lower()
-                collecting = (header == heading.lower())
-                continue
-            if collecting:
-                if stripped.startswith('##'):
-                    break
-                lines.append(stripped)
-        return "\n".join(lines).strip()
+                break
+            lines.append(stripped)
+    return "\n".join(lines).strip()
 
 
 def get_metrics() -> str:

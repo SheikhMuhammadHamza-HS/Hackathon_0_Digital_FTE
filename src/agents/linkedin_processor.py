@@ -10,6 +10,7 @@ from ..config.logging_config import get_logger
 
 from ..utils.goals_reader import get_metrics, get_rules
 from ..services.draft_store import DraftStore
+from ..services.planner import Planner
 
 logger = get_logger(__name__)
 
@@ -33,6 +34,7 @@ class LinkedInProcessor:
             self.model = None
 
         self.draft_store = DraftStore()
+        self.planner = Planner()
 
     def process_trigger_file(self, trigger_file: TriggerFile) -> bool:
         """Generate a LinkedIn draft from a trigger file.
@@ -52,6 +54,19 @@ class LinkedInProcessor:
             rules = ''
 
         trigger_content = self._read_trigger_content(trigger_file)
+
+        # Step 1.5: Generate Plan.md
+        logger.info("Generating Plan.md for LinkedIn post...")
+        plan, plan_path = self.planner.create_and_save_plan(
+            task_type="linkedin_post",
+            task_description="Create a professional LinkedIn post about business updates",
+            context={
+                "metrics_included": bool(metrics),
+                "rules_included": bool(rules),
+                "trigger_path": str(trigger_file.location)
+            }
+        )
+        logger.info(f"Plan created: {plan_path}")
 
         prompt = (
             "Generate a concise LinkedIn post draft using the following information.\n\n"

@@ -117,3 +117,8 @@
 - [ ] T046 Integrated LinkedIn Automation Enhancements <!-- id: 38 -->
     - [ ] Refine LinkedIn post drafting prompts
     - [ ] Improve scheduler robustness
+- [X] T047 [US1] Implement WhatsApp watcher using Playwright browser automation (`src/watchers/whatsapp_watcher.py`)
+- [X] T048 [US2/US3] Implement `Plan.md` generation before drafting for complex reasoning tracking (`src/services/planner.py`)
+- [ ] T049 [US4] Transition internal executors to official MCP Server architecture (email-mcp, browser-mcp)
+- [X] T050 [US1-US4] Implement "Ralph Wiggum" loop (automated persistence) to ensure autonomous task completion until `Needs_Action` is empty
+- [X] T051 [US5] Implement "Monday Morning CEO Briefing" routine as per hackathon requirements

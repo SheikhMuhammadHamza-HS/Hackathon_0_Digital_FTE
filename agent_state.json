@@ -1,9 +1,9 @@
 {
   "id": "current_state",
   "status": "monitoring",
-  "last_processed": "2026-02-11T12:31:37.559440",
-  "files_processed_today": 231,
+  "last_processed": "2026-02-15T01:35:37.119949",
+  "files_processed_today": 249,
   "errors_count": 0,
   "active_watchers": [],
-  "last_updated": "2026-02-11T12:31:37.559442"
+  "last_updated": "2026-02-15T01:35:37.119950"
 }
