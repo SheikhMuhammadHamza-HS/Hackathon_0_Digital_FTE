@@ -1,109 +1,158 @@
+"""Email Sender using MCP Server architecture.
+
+This module uses the email-mcp server to send emails instead of direct API calls.
+"""
+
 import logging
 from pathlib import Path
+from typing import Optional
 
 from ..config import settings
-from ..services.file_mover import FileMover
-from ..services.draft_store import DraftStore
+from ..services.mcp_client import get_mcp_manager
 from ..utils.security import is_safe_path
 
 logger = logging.getLogger(__name__)
 
 
 class EmailSender:
-    """Sends email drafts produced by :class:`EmailProcessor`.
+    """Sends email drafts via MCP email-mcp server.
 
-    The implementation follows the same safety principles as other agents:
-    * No hard‑coded secrets – the Gmail API key is read from ``settings``.
-    * Files are moved only within the project directory using :func:`is_safe_path`.
-    * A missing or invalid API key results in a mock send (logged only).
+    The implementation uses MCP (Model Context Protocol) to communicate with
+    the email-mcp server, which handles the actual Gmail API interactions.
+
+    Safety principles:
+    * No hard-coded secrets – credentials are managed by the MCP server
+    * Files are moved only within the project directory using is_safe_path
+    * Falls back to mock mode if MCP server is unavailable
     """
 
     def __init__(self):
-        self.creds = self._load_credentials()
-        try:
-            from googleapiclient.discovery import build
-            self.service = build('gmail', 'v1', credentials=self.creds)
-            logger.info("EmailSender configured with Gmail API")
-        except Exception as e:
-            logger.error(f"Failed to initialize Gmail API service: {e}")
-            self.service = None
+        """Initialize EmailSender with MCP client."""
+        self.mcp_manager = get_mcp_manager()
+        self.use_mcp = True
 
-    def _load_credentials(self):
-        """Load Gmail OAuth2 credentials from settings."""
-        from google.oauth2.credentials import Credentials
-        # Check for direct TOKEN string (authorized_user_info format)
-        token_info = None
-        if settings.GMAIL_TOKEN:
-             import json
-             try:
-                 token_info = json.loads(settings.GMAIL_TOKEN)
-             except Exception:
-                 logger.error("GMAIL_TOKEN is not a valid JSON string")
-        
-        if token_info:
-            return Credentials.from_authorized_user_info(token_info)
-            
-        # Fallback: check for token.json file in root
-        token_file = Path("token.json")
-        if token_file.exists():
-            from ..watchers.gmail_watcher import SCOPES
-            return Credentials.from_authorized_user_file(str(token_file), SCOPES)
+        # Check if MCP is available
+        if not self.mcp_manager or not self.mcp_manager.clients:
+            logger.warning("MCP configuration not found, will use mock mode")
+            self.use_mcp = False
 
-        return None
+    def _parse_draft(self, draft_path: Path) -> dict:
+        """Parse email draft file to extract headers and body.
+
+        Args:
+            draft_path: Path to the draft file
+
+        Returns:
+            Dictionary with 'to', 'subject', 'body', 'is_html' keys
+        """
+        content = draft_path.read_text(encoding="utf-8")
+
+        result = {
+            'to': '',
+            'subject': 'No Subject',
+            'body': '',
+            'is_html': False
+        }
+
+        lines = content.splitlines()
+        header_done = False
+
+        for line in lines:
+            if not header_done:
+                if line.lower().startswith("to:"):
+                    result['to'] = line.split(":", 1)[1].strip()
+                elif line.lower().startswith("subject:"):
+                    result['subject'] = line.split(":", 1)[1].strip()
+                elif line.lower().startswith("content-type:"):
+                    if 'text/html' in line.lower():
+                        result['is_html'] = True
+                elif not line.strip():
+                    header_done = True
+            else:
+                result['body'] += line + '\n'
+
+        # Clean up body
+        result['body'] = result['body'].strip()
+
+        return result
 
     def send_draft(self, draft_path: Path) -> bool:
-        """Send the draft file via Gmail API."""
-        try:
-            if not self.service:
-                logger.error("Gmail service not initialized. Cannot send email.")
-                return False
+        """Send the draft file via MCP email-mcp server.
 
-            # Safety: ensure the draft lives inside the approved base directory
+        Args:
+            draft_path: Absolute path to a markdown draft in APPROVED_PATH
+
+        Returns:
+            True on success (or mock success), False on failure
+        """
+        try:
+            # Safety check
             base_dir = Path(settings.APPROVED_PATH)
             if not is_safe_path(draft_path, base_dir):
                 logger.error("Unsafe draft path detected: %s", draft_path)
                 return False
 
-            # Read the file
-            content = draft_path.read_text(encoding="utf-8")
-            
-            # Extract headers and body
-            subject = "No Subject"
-            to_addr = ""
-            body = []
-            
-            lines = content.splitlines()
-            header_done = False
-            for line in lines:
-                if not header_done:
-                    if line.lower().startswith("subject:"):
-                        subject = line.split(":", 1)[1].strip()
-                    elif line.lower().startswith("to:"):
-                        to_addr = line.split(":", 1)[1].strip()
-                    elif not line.strip():
-                        header_done = True
-                else:
-                    body.append(line)
+            # Parse the draft
+            parsed = self._parse_draft(draft_path)
 
-            full_body = "\n".join(body)
+            if not parsed['to']:
+                logger.error("No recipient found in draft: %s", draft_path)
+                return False
 
-            # Create MIME message
-            import base64
-            from email.mime.text import MIMEText
-            
-            message = MIMEText(full_body)
-            message['to'] = to_addr
-            message['subject'] = subject
-            
-            raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-            
-            # Send the message
-            print(f"DEBUG: Attempting to send email to {to_addr} via Gmail API...")
-            self.service.users().messages().send(userId='me', body={'raw': raw_message}).execute()
-            
-            logger.info("Successfully sent email to %s", to_addr)
-            print(f"DONE: Email successfully sent to {to_addr}!")
-            return True
+            # Try MCP first
+            if self.use_mcp:
+                return self._send_via_mcp(parsed)
+
+            # Fallback to mock mode
+            return self._send_mock(parsed)
+
         except Exception as e:
             logger.error("Failed to send email draft %s: %s", draft_path, e)
             return False
+
+    def _send_via_mcp(self, parsed: dict) -> bool:
+        """Send email using MCP email-mcp server.
+
+        Args:
+            parsed: Parsed email data
+
+        Returns:
+            True on success, False on failure
+        """
+        try:
+            client = self.mcp_manager.get_client('email-mcp')
+            if not client:
+                logger.warning("email-mcp client not available, falling back to mock mode")
+                return self._send_mock(parsed)
+
+            result = client.call_tool('send_email', {
+                'to': parsed['to'],
+                'subject': parsed['subject'],
+                'body': parsed['body'],
+                'is_html': parsed['is_html']
+            })
+
+            if result and 'content' in result:
+                logger.info("Email sent via MCP: %s", result['content'][0]['text'])
+                return True
+            else:
+                logger.error("MCP send_email returned unexpected result")
+                return False
+
+        except Exception as e:
+            logger.error("Failed to send via MCP: %s", e)
+            return False
+
+    def _send_mock(self, parsed: dict) -> bool:
+        """Mock send for development/testing without MCP.
+
+        Args:
+            parsed: Parsed email data
+
+        Returns:
+            True (mock success)
+        """
+        logger.info("MOCK MODE: Would send email to %s with subject '%s'",
+                    parsed['to'], parsed['subject'])
+        logger.debug("Email body preview: %s", parsed['body'][:200])
+        return True
