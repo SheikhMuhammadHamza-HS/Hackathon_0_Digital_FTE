@@ -78,7 +78,9 @@ class GmailWatcher:
                 sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown')
                 date_str = next((h['value'] for h in headers if h['name'].lower() == 'date'), '')
                 
-                # Extract simple snippet
+                thread_id = msg['threadId']
+                
+                # Extract full snippet or body if available
                 snippet = msg_obj.get('snippet', '')
                 
                 # Prepare markdown content with YAML frontmatter
@@ -86,6 +88,8 @@ class GmailWatcher:
                 content = f"""---
 type: email
 id: "{msg_id}"
+thread_id: "{thread_id}"
+message_id: "{msg_id}"
 from: "{sender}"
 subject: "{subject}"
 received_at: "{date_str}"
@@ -94,6 +98,10 @@ status: pending
 ---
 ## Email Content
 {snippet}
+
+## Threading Info
+Thread-ID: {thread_id}
+Message-ID: {msg_id}
 
 ## Actions Required
 - [ ] Draft a reply

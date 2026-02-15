@@ -38,42 +38,50 @@ class EmailSender:
 
     def _parse_draft(self, draft_path: Path) -> dict:
         """Parse email draft file to extract headers and body.
-
-        Args:
-            draft_path: Path to the draft file
-
-        Returns:
-            Dictionary with 'to', 'subject', 'body', 'is_html' keys
+        
+        Supports standard headers: To, Subject, Platform
+        Supports threading headers: Thread-ID, Message-ID, In-Reply-To
         """
-        content = draft_path.read_text(encoding="utf-8")
+        try:
+            content = draft_path.read_text(encoding="utf-8")
+        except Exception as e:
+            logger.error(f"Failed to read draft {draft_path}: {e}")
+            return {}
 
         result = {
             'to': '',
-            'subject': 'No Subject',
+            'subject': '',
             'body': '',
-            'is_html': False
+            'is_html': False,
+            'thread_id': None,
+            'message_id': None
         }
 
         lines = content.splitlines()
-        header_done = False
+        header_section = True
+        body_lines = []
 
         for line in lines:
-            if not header_done:
-                if line.lower().startswith("to:"):
+            if header_section:
+                if not line.strip():
+                    header_section = False
+                    continue
+                
+                lower_line = line.lower()
+                if lower_line.startswith("to:"):
                     result['to'] = line.split(":", 1)[1].strip()
-                elif line.lower().startswith("subject:"):
+                elif lower_line.startswith("subject:"):
                     result['subject'] = line.split(":", 1)[1].strip()
-                elif line.lower().startswith("content-type:"):
-                    if 'text/html' in line.lower():
-                        result['is_html'] = True
-                elif not line.strip():
-                    header_done = True
+                elif lower_line.startswith("thread-id:"):
+                    result['thread_id'] = line.split(":", 1)[1].strip()
+                elif lower_line.startswith("message-id:") or lower_line.startswith("in-reply-to:"):
+                    result['message_id'] = line.split(":", 1)[1].strip()
+                elif lower_line.startswith("content-type:") and "text/html" in lower_line:
+                    result['is_html'] = True
             else:
-                result['body'] += line + '\n'
+                body_lines.append(line)
 
-        # Clean up body
-        result['body'] = result['body'].strip()
-
+        result['body'] = "\n".join(body_lines).strip()
         return result
 
     def send_draft(self, draft_path: Path) -> bool:
@@ -112,12 +120,7 @@ class EmailSender:
 
     def _send_via_mcp(self, parsed: dict) -> bool:
         """Send email using MCP email-mcp server.
-
-        Args:
-            parsed: Parsed email data
-
-        Returns:
-            True on success, False on failure
+        Uses reply_to_email if thread_id/message_id are present, otherwise send_email.
         """
         try:
             client = self.mcp_manager.get_client('email-mcp')
@@ -125,18 +128,36 @@ class EmailSender:
                 logger.warning("email-mcp client not available, falling back to mock mode")
                 return self._send_mock(parsed)
 
-            result = client.call_tool('send_email', {
+            tool_name = 'send_email'
+            args = {
                 'to': parsed['to'],
                 'subject': parsed['subject'],
                 'body': parsed['body'],
-                'is_html': parsed['is_html']
-            })
+                'is_html': parsed.get('is_html', False)
+            }
 
-            if result and 'content' in result:
-                logger.info("Email sent via MCP: %s", result['content'][0]['text'])
-                return True
+            # Check for threading
+            if parsed.get('thread_id') and parsed.get('message_id'):
+                tool_name = 'reply_to_email'
+                args['threadId'] = parsed['thread_id']
+                args['messageId'] = parsed['message_id']
+                # Remove subject for replies as it's implied
+                if 'subject' in args:
+                    del args['subject']
+
+            logger.info(f"Calling MCP tool {tool_name} for recipient {args['to']}")
+            result = client.call_tool(tool_name, args)
+
+            if result and not result.get('isError'):
+                if 'content' in result:
+                    logger.info("Email sent via MCP: %s", result['content'][0]['text'])
+                    return True
+                else:
+                    logger.error(f"MCP {tool_name} returned success but no content")
+                    return True # Assume success if no isError
             else:
-                logger.error("MCP send_email returned unexpected result")
+                error_msg = result.get('content', [{}])[0].get('text', 'Unknown MCP error') if result else 'No result from MCP'
+                logger.error(f"MCP {tool_name} failed: {error_msg}")
                 return False
 
         except Exception as e:

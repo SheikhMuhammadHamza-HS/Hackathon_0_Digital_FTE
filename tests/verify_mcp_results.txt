@@ -1,0 +1,19 @@
+
+=== Verifying MCP Servers ===
+
+Testing email-mcp...
+  ✅ Client initialized for email-mcp
+  Attempting to list tools for email-mcp...
+  ✅ Successfully listed 2 tools:
+    - send_email: Send an email via Gmail API
+    - get_profile: Get the authenticated user's Gmail profile
+  Server email-mcp stopped.
+
+Testing linkedin-mcp...
+  ✅ Client initialized for linkedin-mcp
+  Attempting to list tools for linkedin-mcp...
+  ✅ Successfully listed 2 tools:
+    - create_post: Create a LinkedIn post
+    - get_profile: Get the authenticated user's LinkedIn profile
+  Server linkedin-mcp stopped.
+

@@ -180,6 +180,16 @@ class AgentCLI:
         persistence = PersistenceLoop(poll_interval=poll_interval)
         thread = threading.Thread(target=persistence.start, daemon=True)
         thread.start()
+        
+        # Also start Gmail watcher as part of the loop
+        try:
+            gmail_watcher = GmailWatcher()
+            gmail_thread = threading.Thread(target=gmail_watcher.start, daemon=True)
+            gmail_thread.start()
+            print('Gmail watcher started in background.')
+        except Exception as e:
+            print(f"Failed to start Gmail watcher: {e}")
+            
         print('Persistence loop started in background. Press Ctrl+C to stop.')
 
         try:

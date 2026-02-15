@@ -1,0 +1,17 @@
+
+=== Testing MCP Servers with REAL Credentials ===
+
+📧 Testing Email MCP (Gmail)...
+  ✅ Client initialized
+  Attempting to fetch Gmail profile...
+  ✅ SUCCESS! Authenticated as: gptapiwork@gmail.com
+  📊 Stats: 237 messages, 220 threads
+
+------------------------------------------------
+
+🔗 Testing LinkedIn MCP...
+  ✅ Client initialized
+  Attempting to fetch LinkedIn profile...
+  ❌ Failed to fetch profile: Error executing get_profile: LINKEDIN_ACCESS_TOKEN environment variable not set
+
+================================================

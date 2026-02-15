@@ -66,7 +66,7 @@ class EmailProcessor:
         
         # Step 1.5: Generate Plan.md
         logger.info("Generating Plan.md for email drafting...")
-        subject, to_addr = self._extract_headers(trigger_content)
+        subject, to_addr, thread_id, message_id = self._extract_headers(trigger_content)
         
         plan_context = {
             "sender": to_addr,
@@ -106,8 +106,6 @@ class EmailProcessor:
         draft_text = response.get('content', [{}])[0].get('text', '')
         logger.info(f"Email draft generated (truncated): {draft_text[:200]}")
 
-        # Extract Subject and To from trigger content (fallback defaults)
-        subject, to_addr = self._extract_headers(trigger_content)
         # For Gmail tasks, clean up subject
         if is_gmail and not subject.startswith("Re:"):
             subject = f"Re: {subject}"
@@ -116,7 +114,14 @@ class EmailProcessor:
         try:
             from ..services.draft_store import DraftStore
             store = DraftStore()
-            store.save_draft(subject=subject, to_addr=to_addr, body=draft_text, platform='email')
+            store.save_draft(
+                subject=subject, 
+                to_addr=to_addr, 
+                body=draft_text, 
+                platform='email',
+                thread_id=thread_id,
+                message_id=message_id
+            )
         except Exception as e:
             logger.error(f"Failed to save draft file: {e}")
             trigger_file.update_status(TriggerStatus.FAILED)
@@ -126,10 +131,12 @@ class EmailProcessor:
         trigger_file.update_status(TriggerStatus.COMPLETED)
         return True
 
-    def _extract_headers(self, content: str) -> tuple[str, str]:
+    def _extract_headers(self, content: str) -> tuple[str, str, str | None, str | None]:
         """Header extraction handling both raw text and YAML frontmatter."""
         subject = "No Subject"
         to_addr = "unknown@example.com"
+        thread_id = None
+        message_id = None
         
         # Check for YAML frontmatter first (for GMAIL tasks)
         if content.startswith('---'):
@@ -139,21 +146,28 @@ class EmailProcessor:
                 if len(parts) >= 3:
                     meta = yaml.safe_load(parts[1])
                     subject = meta.get('subject', subject)
-                    to_addr = meta.get('from', to_addr) # 'from' in task is person who sent us email
+                    to_addr = meta.get('from', to_addr)
+                    thread_id = meta.get('thread_id')
+                    message_id = meta.get('message_id')
             except Exception:
                 pass
         
         # Fallback to line scanning
         if subject == "No Subject" or to_addr == "unknown@example.com":
             for line in content.splitlines():
-                if line.lower().startswith('subject:'):
+                lower_line = line.lower()
+                if lower_line.startswith('subject:'):
                     subject = line.split(':', 1)[1].strip()
-                elif line.lower().startswith('to:'):
+                elif lower_line.startswith('to:'):
                     to_addr = line.split(':', 1)[1].strip()
-                elif line.lower().startswith('from:'):
+                elif lower_line.startswith('from:'):
                     to_addr = line.split(':', 1)[1].strip()
+                elif lower_line.startswith('thread-id:'):
+                    thread_id = line.split(':', 1)[1].strip()
+                elif lower_line.startswith('message-id:'):
+                    message_id = line.split(':', 1)[1].strip()
                     
-        return subject, to_addr
+        return subject, to_addr, thread_id, message_id
 
     def _read_trigger_content(self, trigger_file: TriggerFile) -> str:
         """Read the full text of a trigger file."""
