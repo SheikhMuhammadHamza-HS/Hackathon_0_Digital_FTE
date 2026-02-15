@@ -1,46 +1,21 @@
 #!/usr/bin/env node
 
+/**
+ * Email MCP Server
+ * 
+ * Provides email capabilities via Gmail API through MCP protocol.
+ * Tools: send_email, get_profile, reply_to_email
+ */
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
-  CallToolRequestSchema,
   ListToolsRequestSchema,
+  CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+
 import { google } from 'googleapis';
 
-// Initialize Gmail API
-let gmailService = null;
-
-async function initializeGmail() {
-  const token = process.env.GMAIL_TOKEN;
-  if (!token) {
-    console.error('GMAIL_TOKEN environment variable not set');
-    return false;
-  }
-
-  try {
-    const credentials = JSON.parse(token);
-    const { OAuth2 } = google.auth;
-    const oauth2Client = new OAuth2(
-      credentials.client_id,
-      credentials.client_secret,
-      credentials.redirect_uri
-    );
-    oauth2Client.setCredentials({
-      access_token: credentials.access_token,
-      refresh_token: credentials.refresh_token,
-      expiry_date: credentials.expiry_date
-    });
-
-    gmailService = google.gmail({ version: 'v1', auth: oauth2Client });
-    return true;
-  } catch (error) {
-    console.error('Failed to initialize Gmail:', error.message);
-    return false;
-  }
-}
-
-// Create MCP Server
 const server = new Server(
   {
     name: 'email-mcp',
@@ -53,13 +28,44 @@ const server = new Server(
   }
 );
 
-// List available tools
+let gmailService = null;
+
+/**
+ * Initialize Gmail API service
+ */
+async function initializeGmail() {
+  try {
+    const tokenString = process.env.GMAIL_TOKEN;
+    if (!tokenString) {
+      console.error('GMAIL_TOKEN environment variable not set');
+      return false;
+    }
+
+    const tokenData = JSON.parse(tokenString);
+    // Ensure access_token is set (it might be in 'token' field)
+    if (tokenData.token && !tokenData.access_token) {
+      tokenData.access_token = tokenData.token;
+    }
+
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials(tokenData);
+
+    gmailService = google.gmail({ version: 'v1', auth: oauth2Client });
+    console.error('Gmail service initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize Gmail service:', error);
+    return false;
+  }
+}
+
+// Tool definitions
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
         name: 'send_email',
-        description: 'Send an email via Gmail API',
+        description: 'Send an email via Gmail',
         inputSchema: {
           type: 'object',
           properties: {
@@ -73,7 +79,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             body: {
               type: 'string',
-              description: 'Email body content (plain text or HTML)',
+              description: 'Email body content',
             },
             is_html: {
               type: 'boolean',
@@ -89,6 +95,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: 'object',
           properties: {},
+        },
+      },
+      {
+        name: 'reply_to_email',
+        description: 'Reply to an existing email conversation',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            threadId: {
+              type: 'string',
+              description: 'The ID of the thread to reply to',
+            },
+            messageId: {
+              type: 'string',
+              description: 'The ID of the specific message being replied to (for In-Reply-To header)',
+            },
+            to: {
+              type: 'string',
+              description: 'Recipient email address',
+            },
+            body: {
+              type: 'string',
+              description: 'Reply body content',
+            },
+            is_html: {
+              type: 'boolean',
+              description: 'Whether the body contains HTML (default: false)',
+            },
+          },
+          required: ['threadId', 'messageId', 'to', 'body'],
         },
       },
     ],
@@ -115,18 +151,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new Error('Missing required parameters: to, subject, body');
         }
 
-        const { default: email } = await import('emailjs-mime-builder');
-        const message = new email();
+        // Manual MIME construction with CRLF and basic headers
+        const str = [
+          `To: ${to}`,
+          `Subject: ${subject}`,
+          'MIME-Version: 1.0',
+          `Content-Type: ${is_html ? 'text/html' : 'text/plain'}; charset=utf-8`,
+          'Content-Transfer-Encoding: 7bit',
+          '',
+          body
+        ].join('\r\n');
 
-        message.setSubject(subject);
-        message.setTo(to);
-        message.setTextBody(body);
-
-        if (is_html) {
-          message.setHtmlBody(body);
-        }
-
-        const rawMessage = Buffer.from(message.build()).toString('base64');
+        const rawMessage = Buffer.from(str)
+          .toString('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
 
         const response = await gmailService.users.messages.send({
           userId: 'me',
@@ -165,6 +205,49 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      case 'reply_to_email': {
+        const { threadId, messageId, to, body, is_html = false } = args;
+
+        if (!threadId || !messageId || !to || !body) {
+          throw new Error('Missing required arguments');
+        }
+
+        // Manual MIME construction with CRLF
+        const str = [
+          `To: ${to}`,
+          'MIME-Version: 1.0',
+          `Content-Type: ${is_html ? 'text/html' : 'text/plain'}; charset=utf-8`,
+          'Content-Transfer-Encoding: 7bit',
+          `In-Reply-To: ${messageId}`,
+          `References: ${messageId}`,
+          '',
+          body
+        ].join('\r\n');
+
+        const rawMessage = Buffer.from(str)
+          .toString('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+
+        const response = await gmailService.users.messages.send({
+          userId: 'me',
+          requestBody: {
+            raw: rawMessage,
+            threadId: threadId
+          },
+        });
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Reply sent successfully! New Message ID: ${response.data.id} in Thread: ${response.data.threadId}`,
+            },
+          ],
+        };
+      }
+
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
@@ -181,14 +264,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
-// Start server
+// Start the server
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('Email MCP Server running on stdio');
+  console.error('Email MCP server running on stdio');
 }
 
 main().catch((error) => {
-  console.error('Fatal error:', error);
+  console.error('Fatal error in main():', error);
   process.exit(1);
 });

@@ -201,6 +201,13 @@ class PersistenceLoop:
                     logger.error("Could not move unsuccessful item to Failed: %s", fe)
 
             # Log the action
+            if success:
+                 print(f"✅ Drafted reply for {item_path.name} → Moved to Pending_Approval.")
+                 logger.info(f"✅ Drafted reply for {item_path.name} → Moved to Pending_Approval.")
+            else:
+                 print(f"❌ Failed to process {item_path.name} → Moved to Failed.")
+                 logger.error(f"❌ Failed to process {item_path.name} → Moved to Failed.")
+
             self.audit_logger.log(
                 event="process_needs_action",
                 data={
@@ -282,6 +289,13 @@ class PersistenceLoop:
                     logger.info("Moved approved item to Done: %s", item_id)
 
             # Log the action
+            if success:
+                print(f"🚀 Executed Action for {item_path.name} → SUCCESS")
+                logger.info(f"🚀 Executed Action for {item_path.name} → SUCCESS")
+            else:
+                print(f"❌ Failed to execute {item_path.name}")
+                logger.error(f"❌ Failed to execute {item_path.name}")
+
             self.audit_logger.log(
                 event="execute_approved",
                 data={
@@ -434,15 +448,20 @@ class PersistenceLoop:
         self._update_dashboard_summary()
 
         # Log cycle completion
-        logger.info(
-            "Cycle complete - Processed: %d Needs_Action, %d Approved items",
-            processed_count,
-            executed_count
-        )
+        if processed_count > 0 or executed_count > 0:
+            logger.info(
+                "Cycle complete - Processed: %d drafts created, %d actions executed",
+                processed_count,
+                executed_count
+            )
+        else:
+            # Silent heartbeat or simplified log if nothing happened
+            pass
 
         # Check if Needs_Action is empty
         if self.stats['needs_action_count'] == 0 and self.stats['approved_count'] == 0:
-            logger.info("🎉 All tasks complete! Needs_Action is empty.")
+             # Only log this occasionally or if verbose to reduce noise
+             pass
 
     def start(self) -> None:
         """Start the persistence loop.

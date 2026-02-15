@@ -43,7 +43,18 @@ class MCPClient:
             # Merge with current environment
             import os
             full_env = os.environ.copy()
-            full_env.update(env)
+            
+            # Resolve placeholders in env config
+            resolved_env = {}
+            for k, v in env.items():
+                if isinstance(v, str) and v.startswith("${") and v.endswith("}"):
+                    var_name = v[2:-1]
+                    resolved_value = os.getenv(var_name, "")
+                    resolved_env[k] = resolved_value
+                else:
+                    resolved_env[k] = v
+            
+            full_env.update(resolved_env)
 
             logger.info(f"Starting MCP server: {self.server_name}")
             self.process = subprocess.Popen(
@@ -52,7 +63,7 @@ class MCPClient:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                bufsize=0,
+                bufsize=1,  # Line buffering for text mode (Windows compatible)
                 env=full_env
             )
 
@@ -97,14 +108,37 @@ class MCPClient:
             logger.error(f"MCP server {self.server_name} is not running")
             return None
 
+
         try:
             # Send request
             request_str = json.dumps(request) + '\n'
             self.process.stdin.write(request_str)
             self.process.stdin.flush()
 
-            # Read response
-            response_line = self.process.stdout.readline()
+            # Read response with timeout
+            import threading
+            response_line = None
+            error = None
+            
+            def read_line():
+                nonlocal response_line, error
+                try:
+                    response_line = self.process.stdout.readline()
+                except Exception as e:
+                    error = e
+            
+            thread = threading.Thread(target=read_line, daemon=True)
+            thread.start()
+            thread.join(timeout=5.0)  # 5 second timeout
+            
+            if thread.is_alive():
+                logger.error(f"Timeout waiting for response from MCP server {self.server_name}")
+                return None
+            
+            if error:
+                logger.error(f"Error reading from MCP server {self.server_name}: {error}")
+                return None
+                
             if not response_line:
                 logger.error(f"No response from MCP server {self.server_name}")
                 return None

@@ -73,16 +73,24 @@ class WhatsAppWatcher:
             user_data_dir = Path(settings.LOGS_PATH) / "whatsapp_session"
             user_data_dir.mkdir(parents=True, exist_ok=True)
 
-            self._browser = await playwright.chromium.launch_persistent_context(
-                user_data_dir=str(user_data_dir),
-                headless=self.headless,
-                args=[
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu'
-                ]
-            )
+            logger.info(f"Launching Chromium with user data dir: {user_data_dir}")
+            try:
+                self._browser = await playwright.chromium.launch_persistent_context(
+                    user_data_dir=str(user_data_dir),
+                    headless=self.headless,
+                    args=[
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-gpu',
+                        '--disable-extensions'
+                    ],
+                    # Add a timeout for context launch
+                    timeout=60000 
+                )
+            except Exception as launch_error:
+                logger.error(f"Chromium launch failed: {launch_error}")
+                raise
 
             # Get or create page
             if len(self._browser.pages) > 0:

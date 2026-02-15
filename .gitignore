@@ -115,14 +115,26 @@ temp/
 # Application specific
 Inbox/
 Needs_Action/
+Approved/
+Pending_Approval/
 Done/
+Failed/
+Rejected/
 Logs/
+Plans/
+Briefings/
 Dashboard.md
+agent_state.json
 *.tmp
+mcp_test_output*.txt
+test_mcp_quick.py
+test_mcp_direct.py
+refresh_gmail_token.py
 
 # Secrets
 token.json
 credentials.json
 .playwright_session/
-.playwright_session/state.json
 mcp.json
+mcp-servers/*/node_modules/
+node_modules/
