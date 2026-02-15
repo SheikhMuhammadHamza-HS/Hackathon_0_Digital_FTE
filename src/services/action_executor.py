@@ -5,6 +5,7 @@ from ..utils.file_utils import read_file_head
 from ..agents.email_sender import EmailSender
 from ..agents.linkedin_poster import LinkedInPoster
 from ..agents.x_poster import XPoster
+from ..agents.whatsapp_sender import WhatsAppSender
 from ..services.dashboard_updater import DashboardUpdater
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ class ActionExecutor:
         self.email_sender = EmailSender()
         self.linkedin_poster = LinkedInPoster()
         self.x_poster = XPoster()
+        self.whatsapp_sender = WhatsAppSender()
 
     def _extract_platform(self, draft_path: Path) -> str:
         """Return the platform value from the draft header.
@@ -60,6 +62,12 @@ class ActionExecutor:
             result = self.x_poster.post_draft(draft_path)
             dashboard = DashboardUpdater()
             dashboard.append_entry("X/Twitter draft posted", "SUCCESS" if result else "FAILURE")
+            return result
+        elif platform == "whatsapp":
+            logger.info("Executing WhatsAppSender for %s", draft_path.name)
+            result = self.whatsapp_sender.send_draft(draft_path)
+            dashboard = DashboardUpdater()
+            dashboard.append_entry("WhatsApp draft sent", "SUCCESS" if result else "FAILURE")
             return result
         elif platform == "file_action":
             logger.info("Executing file_action (logging only) for %s", draft_path.name)

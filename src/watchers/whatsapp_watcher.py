@@ -73,18 +73,24 @@ class WhatsAppWatcher:
             user_data_dir = Path(settings.LOGS_PATH) / "whatsapp_session"
             user_data_dir.mkdir(parents=True, exist_ok=True)
 
+            # Modern User Agent to bypass "update browser" message
+            user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
             logger.info(f"Launching Chromium with user data dir: {user_data_dir}")
             try:
                 self._browser = await playwright.chromium.launch_persistent_context(
                     user_data_dir=str(user_data_dir),
                     headless=self.headless,
+                    user_agent=user_agent,
                     args=[
                         '--no-sandbox',
                         '--disable-setuid-sandbox',
                         '--disable-dev-shm-usage',
                         '--disable-gpu',
-                        '--disable-extensions'
+                        '--disable-extensions',
+                        '--disable-blink-features=AutomationControlled'
                     ],
+                    viewport={'width': 1280, 'height': 800},
                     # Add a timeout for context launch
                     timeout=60000 
                 )
@@ -118,19 +124,25 @@ class WhatsAppWatcher:
                     'canvas[aria-label="Scan this QR code to link a device!"]',
                     'canvas',
                     '[data-testid="qrcode"]',
-                    'div[data-ref]'
+                    'div[data-ref]',
+                    'div._akau', # New WhatsApp Web QR container
+                    'div._akav'
                 ]
                 
                 found_qr = False
-                for selector in qr_selectors:
-                    try:
-                        element = await self._page.wait_for_selector(selector, timeout=3000)
-                        if element:
-                            found_qr = True
-                            logger.info(f"QR code element found with selector: {selector}")
-                            break
-                    except:
-                        continue
+                for i in range(5): # Multiple retries for QR to appear
+                    for selector in qr_selectors:
+                        try:
+                            # Use query_selector instead of wait_for to be faster
+                            element = await self._page.query_selector(selector)
+                            if element:
+                                found_qr = True
+                                logger.info(f"QR code element found with selector: {selector}")
+                                break
+                        except:
+                            continue
+                    if found_qr: break
+                    await asyncio.sleep(2)
                 
                 if found_qr:
                     logger.warning("!!! ACTION REQUIRED: PLEASE SCAN THE QR CODE IN THE OPENED BROWSER !!!")

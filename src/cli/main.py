@@ -181,14 +181,20 @@ class AgentCLI:
         thread = threading.Thread(target=persistence.start, daemon=True)
         thread.start()
         
-        # Also start Gmail watcher as part of the loop
+        # Also start watchers as part of the loop
         try:
+            from ..watchers.gmail_watcher import GmailWatcher
             gmail_watcher = GmailWatcher()
             gmail_thread = threading.Thread(target=gmail_watcher.start, daemon=True)
             gmail_thread.start()
             print('Gmail watcher started in background.')
+            
+            from ..watchers.whatsapp_watcher import WhatsAppWatcher, _run_watcher_in_thread
+            whatsapp_thread = threading.Thread(target=_run_watcher_in_thread, args=(poll_interval, True), daemon=True)
+            whatsapp_thread.start()
+            print('WhatsApp watcher started in background.')
         except Exception as e:
-            print(f"Failed to start Gmail watcher: {e}")
+            print(f"Failed to start watchers: {e}")
             
         print('Persistence loop started in background. Press Ctrl+C to stop.')
 

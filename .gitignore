@@ -127,8 +127,11 @@ Dashboard.md
 agent_state.json
 *.tmp
 mcp_test_output*.txt
+whatsapp_test_output*.txt
+whatsapp_result*.json
 test_mcp_quick.py
 test_mcp_direct.py
+test_whatsapp_direct.py
 refresh_gmail_token.py
 
 # Secrets

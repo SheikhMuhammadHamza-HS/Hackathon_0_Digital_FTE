@@ -471,7 +471,7 @@ class PersistenceLoop:
         """
         self.running = True
 
-        logger.info("🔄 Ralph Wiggum persistence loop started")
+        logger.info("Ralph Wiggum persistence loop started")
         logger.info("   Monitoring: %s", self.needs_action_dir)
         logger.info("   Executing: %s", self.approved_dir)
         logger.info("   Updating: %s", self.dashboard_path)
