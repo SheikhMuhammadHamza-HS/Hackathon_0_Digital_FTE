@@ -67,6 +67,7 @@ class PersistenceLoop:
         self.approved_dir = Path(approved_dir or settings.APPROVED_PATH)
         self.done_dir = Path(done_dir or settings.DONE_PATH)
         self.failed_dir = Path(settings.FAILED_PATH)
+        self.pending_approval_dir = Path(settings.PENDING_APPROVAL_PATH)
         self.dashboard_path = Path(dashboard_path or settings.DASHBOARD_PATH)
 
         # Ensure directories exist
@@ -74,6 +75,7 @@ class PersistenceLoop:
         ensure_directory_exists(self.approved_dir)
         ensure_directory_exists(self.done_dir)
         ensure_directory_exists(self.failed_dir)
+        ensure_directory_exists(self.pending_approval_dir)
 
         # Tracking
         self.processed_items: Set[str] = set()
@@ -118,6 +120,47 @@ class PersistenceLoop:
             logger.error("Error listing Approved: %s", e)
             return []
 
+    def _detect_task_type(self, item_path: Path, content: str) -> str:
+        """Detect the task type from filename and content.
+
+        Args:
+            item_path: Path to the task file
+            content: File content
+
+        Returns:
+            Task type string (email, whatsapp, linkedin, x, file, unknown)
+        """
+        item_id = item_path.stem.upper()
+        content_lower = content.lower()
+
+        # Check filename patterns first
+        if item_id.startswith("GMAIL_"):
+            return "email"
+        elif item_id.startswith("WHATSAPP_"):
+            return "whatsapp"
+        elif item_id.startswith("LINKEDIN_"):
+            return "linkedin"
+        elif item_id.startswith("X_") or item_id.startswith("TWITTER_"):
+            return "x"
+        elif item_id.startswith("TRIGGER_"):
+            return "file"
+
+        # Check content patterns
+        if "type: email" in content_lower or "platform: email" in content_lower:
+            return "email"
+        elif "type: whatsapp" in content_lower or "platform: whatsapp" in content_lower:
+            return "whatsapp"
+        elif "type: linkedin" in content_lower or "platform: linkedin" in content_lower:
+            return "linkedin"
+        elif "type: x" in content_lower or "platform: x" in content_lower or "platform: twitter" in content_lower:
+            return "x"
+
+        # Check for WhatsApp-specific content markers
+        if "whatsapp message" in content_lower or "sender:" in content_lower:
+            return "whatsapp"
+
+        return "unknown"
+
     def _process_needs_action_item(self, item_path: Path) -> bool:
         """Process a single item from /Needs_Action.
 
@@ -135,38 +178,36 @@ class PersistenceLoop:
             content = item_path.read_text(encoding='utf-8')
             item_id = item_path.stem
 
-            # Determine task type from frontmatter or filename
-            task_type = "unknown"
-            if "GMAIL_" in item_id:
-                task_type = "email"
-            elif "WHATSAPP_" in item_id or "WhatsApp" in content:
-                task_type = "whatsapp"
-            elif "TRIGGER_" in item_id:
-                task_type = "file"
-            elif "type: email" in content:
-                task_type = "email"
-            elif "type: whatsapp" in content:
-                task_type = "whatsapp"
+            # Determine task type
+            task_type = self._detect_task_type(item_path, content)
 
             logger.info("Processing %s task: %s", task_type, item_id)
 
             # Ralph Wiggum Reasoning Loop (Retry mechanism)
             max_retries = settings.MAX_RETRY_ATTEMPTS
             success = False
-            
+
             for iteration in range(1, max_retries + 1):
                 logger.info("Ralph Wiggum Reasoning Loop - Iteration %d/%d for %s", iteration, max_retries, item_id)
-                
+
                 # Import appropriate processor
-                if task_type == "email":
-                    from ..agents.email_processor import EmailProcessor
-                    processor = EmailProcessor()
-                elif task_type == "whatsapp":
-                    from ..agents.whatsapp_processor import WhatsAppProcessor
-                    processor = WhatsAppProcessor()
-                else:
-                    from ..agents.file_processor import FileProcessor
-                    processor = FileProcessor()
+                processor = None
+                try:
+                    if task_type == "email":
+                        from ..agents.email_processor import EmailProcessor
+                        processor = EmailProcessor()
+                    elif task_type == "whatsapp":
+                        from ..agents.whatsapp_processor import WhatsAppProcessor
+                        processor = WhatsAppProcessor()
+                    elif task_type == "linkedin":
+                        from ..agents.linkedin_processor import LinkedInProcessor
+                        processor = LinkedInProcessor()
+                    else:
+                        from ..agents.file_processor import FileProcessor
+                        processor = FileProcessor()
+                except ImportError as ie:
+                    logger.error(f"Failed to import processor for {task_type}: {ie}")
+                    break
 
                 # Create trigger file
                 trigger_file = TriggerFile(
@@ -180,27 +221,31 @@ class PersistenceLoop:
                 )
 
                 # Process the trigger
-                success = processor.process_trigger_file(trigger_file)
-                
+                try:
+                    success = processor.process_trigger_file(trigger_file)
+                except Exception as pe:
+                    logger.error("Processor error on iteration %d: %s", iteration, pe)
+                    success = False
+
                 if success:
                     logger.info("Successfully processed %s on iteration %d", item_id, iteration)
                     break
                 else:
                     logger.warning("Iteration %d failed for %s. Retrying...", iteration, item_id)
                     if iteration < max_retries:
-                        time.sleep(2) # Brief backoff for transient issues
+                        time.sleep(2)  # Brief backoff for transient issues
 
             # Move to Done if successful (to prevent re-processing)
             if success:
                 from .file_mover import FileMover
                 file_mover = FileMover()
                 done_path = self.done_dir / item_path.name
-                
+
                 # Check for existing file to avoid name collision
                 if done_path.exists():
                     timestamp = datetime.now().strftime("%H%M%S")
                     done_path = self.done_dir / f"{item_path.stem}_{timestamp}{item_path.suffix}"
-                
+
                 try:
                     item_path.rename(done_path)
                     logger.info("Moved processed item to Done: %s", item_path.name)
@@ -217,11 +262,11 @@ class PersistenceLoop:
 
             # Log the action
             if success:
-                 print(f"✅ Drafted reply for {item_path.name} → Moved to Pending_Approval.")
-                 logger.info(f"✅ Drafted reply for {item_path.name} → Moved to Pending_Approval.")
+                print(f"✅ Drafted reply for {item_path.name} → Moved to Pending_Approval.")
+                logger.info(f"✅ Drafted reply for {item_path.name} → Moved to Pending_Approval.")
             else:
-                 print(f"❌ Failed to process {item_path.name} → Moved to Failed.")
-                 logger.error(f"❌ Failed to process {item_path.name} → Moved to Failed.")
+                print(f"❌ Failed to process {item_path.name} → Moved to Failed.")
+                logger.error(f"❌ Failed to process {item_path.name} → Moved to Failed.")
 
             self.audit_logger.log(
                 event="process_needs_action",
@@ -248,7 +293,7 @@ class PersistenceLoop:
 
         except Exception as e:
             logger.error("Error processing Needs_Action item %s: %s", item_path, e)
-            
+
             # Move to Failed to prevent infinite retry loop
             try:
                 failed_path = self.failed_dir / item_path.name
@@ -299,9 +344,22 @@ class PersistenceLoop:
             # Move to Done if successful
             if success:
                 done_path = self.done_dir / item_path.name
-                if is_safe_path(str(done_path), str(self.done_dir)):
+                try:
+                    # Check for name collision
+                    if done_path.exists():
+                        timestamp = datetime.now().strftime("%H%M%S")
+                        done_path = self.done_dir / f"{item_path.stem}_{timestamp}{item_path.suffix}"
+
                     item_path.rename(done_path)
                     logger.info("Moved approved item to Done: %s", item_id)
+                except Exception as me:
+                    logger.error("Failed to move item to Done: %s", me)
+                    # Try using FileMover as fallback
+                    try:
+                        file_mover.move_file(item_path, done_path)
+                        logger.info("Moved approved item to Done using FileMover: %s", item_id)
+                    except Exception as fme:
+                        logger.error("FileMover also failed: %s", fme)
 
             # Log the action
             if success:
@@ -325,12 +383,15 @@ class PersistenceLoop:
             try:
                 status = "EXECUTED" if success else "FAILED"
                 action_type = "Approved action"
-                if "email" in content.lower():
+                content_lower = content.lower()
+                if "email" in content_lower:
                     action_type = "Email sent"
-                elif "linkedin" in content.lower():
+                elif "linkedin" in content_lower:
                     action_type = "LinkedIn post published"
-                elif "whatsapp" in content.lower():
+                elif "whatsapp" in content_lower:
                     action_type = "WhatsApp message sent"
+                elif "x" in content_lower or "twitter" in content_lower:
+                    action_type = "X/Twitter post published"
 
                 self.dashboard_updater.append_entry(
                     f"{action_type}: {item_id}",
@@ -378,6 +439,7 @@ class PersistenceLoop:
 | Folder | Count | Status |
 |--------|-------|--------|
 | /Needs_Action | {self.stats['needs_action_count']} | {'⚠️ Items pending' if self.stats['needs_action_count'] > 0 else '✓ Empty'} |
+| /Pending_Approval | {self._count_files(self.pending_approval_dir)} | {'⏳ Awaiting review' if self._count_files(self.pending_approval_dir) > 0 else '✓ Empty'} |
 | /Approved | {self.stats['approved_count']} | {'⏳ Awaiting execution' if self.stats['approved_count'] > 0 else '✓ Empty'} |
 | /Done | {self.stats['done_count']} | Completed |
 
@@ -396,9 +458,8 @@ class PersistenceLoop:
                     parts = existing.split("## System Summary")
                     before_summary = parts[0]
                     rest = parts[1]
-                    
+
                     # Find where the next section starts (if any)
-                    # We look for the next "## " that isn't part of the summary table
                     summary_end_marker = "---"
                     if summary_end_marker in rest:
                         after_summary_parts = rest.split(summary_end_marker, 1)
@@ -409,8 +470,8 @@ class PersistenceLoop:
                         if header_index != -1:
                             after_summary = rest[header_index:]
                         else:
-                            after_summary = "\n\n## Recent Activity\n" # Default if everything was lost
-                    
+                            after_summary = "\n\n## Recent Activity\n"  # Default if everything was lost
+
                     new_content = before_summary + "## System Summary\n" + summary + after_summary
                     self.dashboard_path.write_text(new_content, encoding='utf-8')
                 else:
@@ -469,14 +530,10 @@ class PersistenceLoop:
                 processed_count,
                 executed_count
             )
-        else:
-            # Silent heartbeat or simplified log if nothing happened
-            pass
 
         # Check if Needs_Action is empty
         if self.stats['needs_action_count'] == 0 and self.stats['approved_count'] == 0:
-             # Only log this occasionally or if verbose to reduce noise
-             pass
+            logger.debug("All queues empty - ready for new tasks")
 
     def start(self) -> None:
         """Start the persistence loop.
