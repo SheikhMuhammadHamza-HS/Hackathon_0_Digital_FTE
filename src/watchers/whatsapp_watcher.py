@@ -14,6 +14,7 @@ Anti-Detection & Resilience Features:
 - Selector fallback system for UI changes
 - Auto-reconnect on session loss
 - Health monitoring and graceful degradation
+- Message hashing for duplicate prevention (persistent across restarts)
 """
 import asyncio
 import logging
@@ -28,7 +29,6 @@ import json
 from ..config.settings import settings
 from ..utils.file_utils import ensure_directory_exists
 from ..utils.security import is_safe_path
-from ..agents.email_processor import EmailProcessor
 from ..models.trigger_file import TriggerFile, TriggerStatus
 
 logger = logging.getLogger(__name__)
@@ -144,7 +144,7 @@ class WhatsAppWatcher:
 
         Args:
             poll_interval: Seconds between poll cycles (default: 60)
-            headless: Run browser in headless mode (default: True)
+            headless: Run browser in headless mode (default: False for QR scan)
             max_retries: Maximum retry attempts for failed operations
             reconnect_delay: Seconds to wait before reconnection attempts
         """
@@ -154,8 +154,12 @@ class WhatsAppWatcher:
         self.reconnect_delay = reconnect_delay
         self.needs_action_path = Path(settings.NEEDS_ACTION_PATH)
         ensure_directory_exists(self.needs_action_path)
-        self.running = False
+
+        # Load processed hashes from persistent storage
         self.processed_hashes: set = set()
+        self._load_processed_hashes()
+
+        self.running = False
         self._browser = None
         self._page = None
         self._context = None
@@ -169,6 +173,37 @@ class WhatsAppWatcher:
             "WhatsAppWatcher initialized (poll=%ds, headless=%s, max_retries=%d)",
             poll_interval, headless, max_retries
         )
+
+    def _get_processed_hashes_path(self) -> Path:
+        """Get path to processed hashes storage file."""
+        logs_path = Path(settings.LOGS_PATH)
+        logs_path.mkdir(parents=True, exist_ok=True)
+        return logs_path / "whatsapp_processed_hashes.json"
+
+    def _load_processed_hashes(self) -> None:
+        """Load processed message hashes from persistent storage."""
+        try:
+            hashes_path = self._get_processed_hashes_path()
+            if hashes_path.exists():
+                with open(hashes_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self.processed_hashes = set(data.get('hashes', []))
+                logger.info(f"Loaded {len(self.processed_hashes)} processed message hashes")
+        except Exception as e:
+            logger.warning(f"Failed to load processed hashes: {e}")
+            self.processed_hashes = set()
+
+    def _save_processed_hashes(self) -> None:
+        """Save processed message hashes to persistent storage."""
+        try:
+            hashes_path = self._get_processed_hashes_path()
+            with open(hashes_path, 'w', encoding='utf-8') as f:
+                json.dump({
+                    'hashes': list(self.processed_hashes),
+                    'last_updated': datetime.now().isoformat()
+                }, f)
+        except Exception as e:
+            logger.warning(f"Failed to save processed hashes: {e}")
 
     def _get_stealth_script(self) -> str:
         """Generate comprehensive stealth script to evade detection."""
@@ -261,7 +296,6 @@ class WhatsAppWatcher:
             };
 
             // 10. Remove automation-specific event listeners
-            // These are often added by Selenium/Playwright/Puppeteer
             if (window.EventTarget) {
                 const originalAdd = EventTarget.prototype.addEventListener;
                 EventTarget.prototype.addEventListener = function(type, listener, options) {
@@ -925,7 +959,8 @@ class WhatsAppWatcher:
             msg_timestamp = message.get('timestamp', '')
 
             timestamp = datetime.now().isoformat()
-            task_id = f"WHATSAPP_{timestamp.replace(':', '-').replace('.', '-')}"
+            safe_sender = "".join(c if c.isalnum() or c in '-_' else '_' for c in sender)[:30]
+            task_id = f"WHATSAPP_{timestamp.replace(':', '-').replace('.', '-')}_{safe_sender}"
 
             content = f"""---
 type: whatsapp_message
@@ -937,13 +972,20 @@ detected_at: "{timestamp}"
 status: pending
 ---
 
-## Message from {sender}
+## WhatsApp Message from {sender}
+
+**Received:** {msg_timestamp}
+
+### Message Content
 
 {msg_text}
 
+---
+
 ## Actions Required
-- [ ] Read and understand message
-- [ ] Draft response (if needed) - will require approval
+- [x] Read and understand message
+- [ ] Generate contextual response using Gemini AI
+- [ ] Save draft to Pending_Approval for human review
 - [ ] Mark as processed
 """
 
@@ -955,6 +997,7 @@ status: pending
 
             file_path.write_text(content, encoding='utf-8')
             self.processed_hashes.add(msg_hash)
+            self._save_processed_hashes()  # Persist immediately
 
             logger.info("✓ Created task file: %s", file_path.name)
             logger.info("  - Sender: %s", sender)
@@ -973,46 +1016,43 @@ status: pending
             logger.warning("Browser not initialized")
             return 0
 
-        try:
-            messages = await self._get_unread_messages()
-            created_count = 0
+        created_count = 0
+        retry_count = 0
+        max_extraction_retries = 3
 
-            for message in messages:
-                # Skip if already processed
-                msg_hash = self._create_message_hash(message)
-                if msg_hash in self.processed_hashes:
-                    continue
+        while retry_count < max_extraction_retries:
+            try:
+                messages = await self._get_unread_messages()
 
-                task_path = await self._create_task_file(message)
-                if task_path:
-                    created_count += 1
+                for message in messages:
+                    # Skip if already processed
+                    msg_hash = self._create_message_hash(message)
+                    if msg_hash in self.processed_hashes:
+                        continue
 
-                    # Process the message
-                    try:
-                        trigger_file = TriggerFile(
-                            id=message.get('id', ''),
-                            filename=task_path.name,
-                            type="whatsapp",
-                            source_path=str(task_path),
-                            status=TriggerStatus.PENDING,
-                            timestamp=datetime.now(),
-                            location=str(task_path)
-                        )
+                    task_path = await self._create_task_file(message)
+                    if task_path:
+                        created_count += 1
 
-                        processor = EmailProcessor()
-                        processor.process_trigger_file(trigger_file)
-                    except Exception as pe:
-                        logger.error("Failed to process task %s: %s", task_path.name, pe)
+                if created_count > 0:
+                    logger.info("Processed %d new messages", created_count)
+                    self._last_successful_poll = datetime.now()
 
-            if created_count > 0:
-                logger.info("Processed %d new messages", created_count)
-                self._last_successful_poll = datetime.now()
+                # Success - break out of retry loop
+                break
 
-            return created_count
+            except Exception as e:
+                retry_count += 1
+                logger.error(f"Poll attempt {retry_count} failed: {e}")
 
-        except Exception as e:
-            logger.error("Poll failed: %s", e)
-            return 0
+                if retry_count >= max_extraction_retries:
+                    logger.error("Max extraction retries reached")
+                    break
+
+                # Wait before retry with exponential backoff
+                await asyncio.sleep(2 ** retry_count)
+
+        return created_count
 
     async def start(self) -> None:
         """Start the WhatsApp watcher loop."""
