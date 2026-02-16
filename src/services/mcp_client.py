@@ -63,6 +63,7 @@ class MCPClient:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                encoding='utf-8',  # Force UTF-8 for Unicode support (emojis)
                 bufsize=1,  # Line buffering for text mode (Windows compatible)
                 env=full_env
             )
@@ -129,7 +130,7 @@ class MCPClient:
             
             thread = threading.Thread(target=read_line, daemon=True)
             thread.start()
-            thread.join(timeout=5.0)  # 5 second timeout
+            thread.join(timeout=30.0)  # 30 second timeout
             
             if thread.is_alive():
                 logger.error(f"Timeout waiting for response from MCP server {self.server_name}")

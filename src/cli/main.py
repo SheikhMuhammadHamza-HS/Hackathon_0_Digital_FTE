@@ -190,7 +190,7 @@ class AgentCLI:
             print('Gmail watcher started in background.')
             
             from ..watchers.whatsapp_watcher import WhatsAppWatcher, _run_watcher_in_thread
-            whatsapp_thread = threading.Thread(target=_run_watcher_in_thread, args=(poll_interval, True), daemon=True)
+            whatsapp_thread = threading.Thread(target=_run_watcher_in_thread, args=(poll_interval, False), daemon=True)
             whatsapp_thread.start()
             print('WhatsApp watcher started in background.')
         except Exception as e:

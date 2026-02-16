@@ -150,30 +150,45 @@ class PersistenceLoop:
 
             logger.info("Processing %s task: %s", task_type, item_id)
 
-            # Import appropriate processor
-            if task_type == "email":
-                from ..agents.email_processor import EmailProcessor
-                processor = EmailProcessor()
-            elif task_type == "whatsapp":
-                from ..agents.email_processor import EmailProcessor
-                processor = EmailProcessor()  # Use email processor as base
-            else:
-                from ..agents.file_processor import FileProcessor
-                processor = FileProcessor()
+            # Ralph Wiggum Reasoning Loop (Retry mechanism)
+            max_retries = settings.MAX_RETRY_ATTEMPTS
+            success = False
+            
+            for iteration in range(1, max_retries + 1):
+                logger.info("Ralph Wiggum Reasoning Loop - Iteration %d/%d for %s", iteration, max_retries, item_id)
+                
+                # Import appropriate processor
+                if task_type == "email":
+                    from ..agents.email_processor import EmailProcessor
+                    processor = EmailProcessor()
+                elif task_type == "whatsapp":
+                    from ..agents.whatsapp_processor import WhatsAppProcessor
+                    processor = WhatsAppProcessor()
+                else:
+                    from ..agents.file_processor import FileProcessor
+                    processor = FileProcessor()
 
-            # Create trigger file
-            trigger_file = TriggerFile(
-                id=item_id,
-                filename=item_path.name,
-                type=task_type,
-                source_path=str(item_path),
-                status=TriggerStatus.PENDING,
-                timestamp=datetime.now(),
-                location=str(item_path)
-            )
+                # Create trigger file
+                trigger_file = TriggerFile(
+                    id=item_id,
+                    filename=item_path.name,
+                    type=task_type,
+                    source_path=str(item_path),
+                    status=TriggerStatus.PENDING,
+                    timestamp=datetime.now(),
+                    location=str(item_path)
+                )
 
-            # Process the trigger
-            success = processor.process_trigger_file(trigger_file)
+                # Process the trigger
+                success = processor.process_trigger_file(trigger_file)
+                
+                if success:
+                    logger.info("Successfully processed %s on iteration %d", item_id, iteration)
+                    break
+                else:
+                    logger.warning("Iteration %d failed for %s. Retrying...", iteration, item_id)
+                    if iteration < max_retries:
+                        time.sleep(2) # Brief backoff for transient issues
 
             # Move to Done if successful (to prevent re-processing)
             if success:
