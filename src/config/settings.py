@@ -12,6 +12,9 @@ else:
 class Settings:
     """Configuration loaded from environment variables."""
 
+    # Class-level base directory
+    BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
     def __init__(self):
         # API keys (required for some agents)
         self.CLAUDE_CODE_API_KEY: str = os.getenv("CLAUDE_CODE_API_KEY", "")
