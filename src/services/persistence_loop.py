@@ -197,8 +197,8 @@ class PersistenceLoop:
                         from ..agents.email_processor import EmailProcessor
                         processor = EmailProcessor()
                     elif task_type == "whatsapp":
-                        from ..agents.whatsapp_processor import WhatsAppProcessor
-                        processor = WhatsAppProcessor()
+                        from ..agents.whatsapp_processor_simple import WhatsAppProcessorSimple
+                        processor = WhatsAppProcessorSimple()
                     elif task_type == "linkedin":
                         from ..agents.linkedin_processor import LinkedInProcessor
                         processor = LinkedInProcessor()
@@ -222,7 +222,10 @@ class PersistenceLoop:
 
                 # Process the trigger
                 try:
-                    success = processor.process_trigger_file(trigger_file)
+                    if task_type == "whatsapp":
+                        success = processor.process_task(item_path)
+                    else:
+                        success = processor.process_trigger_file(trigger_file)
                 except Exception as pe:
                     logger.error("Processor error on iteration %d: %s", iteration, pe)
                     success = False
