@@ -14,7 +14,7 @@ from ..utils.file_utils import read_file_head, extract_platform_header
 from ..agents.email_sender import EmailSender
 from ..agents.linkedin_poster import LinkedInPoster
 from ..agents.x_poster import XPoster
-from ..agents.whatsapp_sender_mock import WhatsAppSenderMock
+from ..agents.whatsapp_sender import WhatsAppSender
 from ..services.dashboard_updater import DashboardUpdater
 from ..config.settings import settings
 
@@ -33,7 +33,7 @@ class ActionExecutor:
         self.email_sender = EmailSender()
         self.linkedin_poster = LinkedInPoster()
         self.x_poster = XPoster()
-        self.whatsapp_sender = WhatsAppSenderMock()
+        self.whatsapp_sender = WhatsAppSender(mode="playwright")
         self.dashboard = DashboardUpdater()
 
     def _extract_platform(self, draft_path: Path) -> str:
