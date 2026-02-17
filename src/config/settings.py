@@ -45,6 +45,10 @@ class Settings:
         self.X_USERNAME: str = os.getenv("X_USERNAME", "")
         self.X_PASSWORD: str = os.getenv("X_PASSWORD", "")
 
+        # WhatsApp Business API settings
+        self.WHATSAPP_PHONE_NUMBER_ID: str = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+        self.WHATSAPP_ACCESS_TOKEN: str = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
+
         # Operational limits
         self.FILE_SIZE_LIMIT: int = int(os.getenv("FILE_SIZE_LIMIT", "10485760"))  # 10 MiB
         self.MAX_RETRY_ATTEMPTS: int = int(os.getenv("MAX_RETRY_ATTEMPTS", "3"))

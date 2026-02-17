@@ -120,11 +120,7 @@ class WhatsAppSender:
     def _parse_draft(self, draft_path: Path) -> Dict[str, Any]:
         """Extract metadata and body from the markdown draft.
 
-        Args:
-            draft_path: Path to the draft file
-
-        Returns:
-            Dictionary with 'to', 'body', 'platform', and optional metadata
+        Handles YAML frontmatter format with --- markers.
         """
         content = draft_path.read_text(encoding='utf-8')
         lines = content.splitlines()
@@ -138,37 +134,70 @@ class WhatsAppSender:
             'message_id': None
         }
 
-        body_start_idx = len(lines)  # Default to end if no body found
-        in_header = True
-        header_fields = {'to', 'subject', 'platform', 'thread-id', 'message-id'}
+        # Check if YAML frontmatter exists
+        if lines and lines[0].strip() == '---':
+            # YAML frontmatter format
+            in_frontmatter = True
+            frontmatter_end = -1
 
-        for i, line in enumerate(lines):
-            if not in_header:
-                break
+            for i in range(1, len(lines)):
+                line = lines[i]
+                stripped = line.strip()
 
-            stripped = line.strip()
-            line_lower = stripped.lower()
+                if stripped == '---':
+                    frontmatter_end = i
+                    break
 
-            if stripped.startswith('To:'):
-                metadata['to'] = stripped.split(':', 1)[1].strip()
-            elif stripped.startswith('Subject:'):
-                metadata['subject'] = stripped.split(':', 1)[1].strip()
-            elif stripped.startswith('Platform:'):
-                metadata['platform'] = stripped.split(':', 1)[1].strip().lower()
-            elif stripped.startswith('Thread-ID:'):
-                metadata['thread_id'] = stripped.split(':', 1)[1].strip()
-            elif stripped.startswith('Message-ID:'):
-                metadata['message_id'] = stripped.split(':', 1)[1].strip()
-            elif stripped == '' and i > 0:
-                # Empty line after headers indicates start of body
-                body_start_idx = i + 1
-                in_header = False
-            elif i > 0 and not any(line_lower.startswith(field) for field in header_fields):
-                # Line doesn't start with a header field - body started
-                body_start_idx = i
-                in_header = False
+                # Parse fields
+                if ':' in stripped:
+                    key, value = stripped.split(':', 1)
+                    key = key.strip().lower()
+                    value = value.strip()
 
-        metadata['body'] = '\n'.join(lines[body_start_idx:]).strip()
+                    if key == 'to':
+                        metadata['to'] = value
+                    elif key == 'subject':
+                        metadata['subject'] = value
+                    elif key == 'platform':
+                        metadata['platform'] = value.lower()
+                    elif key == 'original_sender':
+                        if not metadata['to']:
+                            metadata['to'] = value
+                    elif key == 'thread-id':
+                        metadata['thread_id'] = value
+                    elif key == 'message-id':
+                        metadata['message_id'] = value
+
+            # Body is after frontmatter
+            if frontmatter_end > 0:
+                body_lines = []
+                for line in lines[frontmatter_end + 1:]:
+                    stripped = line.strip()
+                    # Skip markdown headers and instructions
+                    if stripped.startswith('#') or stripped.startswith('**'):
+                        continue
+                    if stripped:
+                        body_lines.append(stripped)
+                metadata['body'] = ' '.join(body_lines).strip()
+        else:
+            # Simple format without YAML frontmatter
+            in_body = False
+            body_lines = []
+
+            for line in lines:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+
+                if stripped.lower().startswith('to:'):
+                    metadata['to'] = stripped.split(':', 1)[1].strip()
+                elif stripped.lower().startswith('platform:'):
+                    metadata['platform'] = stripped.split(':', 1)[1].strip().lower()
+                elif ':' not in stripped or in_body:
+                    body_lines.append(stripped)
+                    in_body = True
+
+            metadata['body'] = ' '.join(body_lines).strip()
 
         # Log parsed info
         logger.info(f"Parsed draft - To: {metadata['to']}, Platform: {metadata['platform']}")
