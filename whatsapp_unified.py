@@ -105,9 +105,6 @@ class UnifiedWhatsAppHITL:
                 except:
                     continue
 
-            # Capture initial state - mark all current chats as "seen"
-            await self._capture_initial_state()
-
             if not logged_in:
                 logger.info("=" * 60)
                 logger.info("PLEASE SCAN QR CODE")
@@ -143,81 +140,82 @@ class UnifiedWhatsAppHITL:
 
                 logger.info("Login successful!")
 
+            # NOW capture initial state after successful login
+            await self._capture_initial_state()
+
             return True
 
         except Exception as e:
             logger.error(f"Browser initialization failed: {e}")
             return False
 
-    async def _record_initial_chats(self):
-        """Record all existing chats so we don't process old messages."""
-        try:
-            logger.info("[INIT] Recording existing chats (will ignore old messages)...")
-
-            # Wait for page to fully load
-            await asyncio.sleep(5)
-
-            # Try to get all chat items
-            for selector in ['div[data-testid="cell-frame-container"]', 'div[role="listitem"]', '#pane-side div[role="grid"] > div', 'div._ak8l']:
-                try:
-                    chats = await self.page.query_selector_all(selector)
-                    if chats:
-                        for chat in chats:
-                            try:
-                                for title_selector in ['span[dir="auto"]', 'span[title]', 'div[title]']:
-                                    title_elem = await chat.query_selector(title_selector)
-                                    if title_elem:
-                                        sender = await title_elem.text_content() or "Unknown"
-                                        if sender and sender != "Unknown":
-                                            self.initial_chats.add(sender)
-                                            break
-                            except:
-                                continue
-                        break
-                except:
-                    continue
-
-            logger.info(f"[INIT] Recorded {len(self.initial_chats)} existing chats")
-
-        except Exception as e:
-            logger.warning(f"[INIT] Could not record initial chats: {e}")
-
     async def _capture_initial_state(self):
-        """Capture initial state of chats - mark all existing as 'seen' so we only process NEW messages."""
+        """Capture initial state - record sender+timestamp to detect only NEW messages."""
         try:
-            logger.info("[INIT] Capturing initial chat state - existing messages will be ignored")
+            logger.info("[INIT] Recording current chat states...")
+            await asyncio.sleep(5)  # Wait for WhatsApp to fully load chats
 
-            # Get all chat items
-            for selector in ['div[data-testid="cell-frame-container"]', 'div[role="listitem"]', '#pane-side div[role="grid"] > div']:
+            # Use same selectors as scan_messages
+            all_chats = []
+            for selector in ['div[data-testid="cell-frame-container"]', 'div[role="listitem"]', '#pane-side div[role="grid"] > div', 'div._ak8l', 'div._ak8h']:
                 try:
                     chats = await self.page.query_selector_all(selector)
-                    if chats:
-                        for chat in chats:
-                            try:
-                                # Get sender name
-                                for title_selector in ['span[dir="auto"]', 'span[title]', 'div[title]']:
-                                    title_elem = await chat.query_selector(title_selector)
-                                    if title_elem:
-                                        sender = await title_elem.text_content() or "Unknown"
-                                        if sender and sender != "Unknown":
-                                            self.initial_chats.add(sender)
-                                            break
-                            except:
-                                continue
-                        logger.info(f"[INIT] Marked {len(self.initial_chats)} existing chats as 'seen'")
+                    if chats and len(chats) > 0:
+                        all_chats = chats
+                        logger.info(f"[INIT] Using selector: {selector}, found {len(chats)} chats")
                         break
                 except:
                     continue
 
-            # Wait a moment then capture again to ensure we have latest state
-            await asyncio.sleep(5)
-            logger.info("[INIT] Ready! Only NEW messages from now will be processed")
+            recorded = 0
+            for chat in all_chats:
+                try:
+                    # Get sender name
+                    sender = "Unknown"
+                    for title_selector in ['span[dir="auto"]', 'span[title]', 'div[title]']:
+                        title_elem = await chat.query_selector(title_selector)
+                        if title_elem:
+                            sender = await title_elem.text_content() or "Unknown"
+                            sender = sender.strip()
+                            if sender and sender != "Unknown":
+                                break
+
+                    if not sender or sender == "Unknown":
+                        continue
+
+                    # Get timestamp - same selectors as scan_messages
+                    last_msg_time = ""
+                    for time_selector in ['span[data-testid="last-msg-status"]', 'div[class*="time"]', 'span[class*="time"]']:
+                        time_elem = await chat.query_selector(time_selector)
+                        if time_elem:
+                            last_msg_time = await time_elem.text_content() or ""
+                            last_msg_time = last_msg_time.strip()
+                            break
+
+                    # Record this state (even if timestamp is empty - use sender only as fallback)
+                    if last_msg_time:
+                        chat_key = f"{sender}_{last_msg_time}"
+                    else:
+                        chat_key = f"{sender}_no_time"
+                    self.processed_messages.add(chat_key)
+                    self.initial_chats.add(sender)
+                    recorded += 1
+
+                except:
+                    continue
+
+            logger.info(f"[INIT] Recorded {recorded} chats with timestamps")
+            logger.info(f"[INIT] Total unique senders: {len(self.initial_chats)}")
 
         except Exception as e:
             logger.warning(f"[INIT] Could not capture initial state: {e}")
 
     async def scan_messages(self) -> int:
-        """Scan for new WhatsApp messages using the shared browser."""
+        """Scan for new WhatsApp messages using the shared browser.
+
+        Uses timestamp-based detection instead of unread indicators.
+        Compares current chat state with previous state to detect new messages.
+        """
         try:
             logger.info("[WATCHER] Scanning for new messages...")
 
@@ -226,34 +224,26 @@ class UnifiedWhatsAppHITL:
                 await self.page.goto("https://web.whatsapp.com", wait_until="networkidle")
                 await asyncio.sleep(3)
 
-            # Refresh to ensure latest state
-            await self.page.reload(wait_until="networkidle")
-            await asyncio.sleep(3)
+            # Don't reload - it disrupts the session. Just ensure we're on the page
+            await asyncio.sleep(2)
 
-            # Wait for chat list to load
-            await asyncio.sleep(5)
-
-            # Get all chat items - try multiple selectors (WhatsApp changes these often)
+            # Get all chat items - try multiple selectors
             chats = []
             selectors_to_try = [
                 'div[data-testid="cell-frame-container"]',
                 'div[role="listitem"]',
-                'div[data-testid="chat-list"] > div > div',
                 '#pane-side div[role="grid"] > div',
                 'div._ak8l',
                 'div._ak8h',
-                'div[class*="chat"]',
-                'div.x1n2onr6',  # Generic WhatsApp class pattern
             ]
 
             for selector in selectors_to_try:
                 try:
                     chats = await self.page.query_selector_all(selector)
                     if chats and len(chats) > 0:
-                        logger.info(f"[WATCHER] Found {len(chats)} chats using: {selector}")
+                        logger.info(f"[WATCHER] Found {len(chats)} chats")
                         break
                 except Exception as e:
-                    logger.debug(f"Selector {selector} failed: {e}")
                     continue
 
             if not chats:
@@ -261,89 +251,71 @@ class UnifiedWhatsAppHITL:
                 return 0
 
             new_count = 0
-            processed_senders = set()
 
-            for i, chat in enumerate(chats[:15]):  # Check first 15 chats
+            for i, chat in enumerate(chats[:20]):  # Check first 20 chats
                 try:
-                    # Get sender name first
+                    # Get sender name
                     sender = "Unknown"
                     for title_selector in ['span[dir="auto"]', 'span[title]', 'div[title]']:
                         title_elem = await chat.query_selector(title_selector)
                         if title_elem:
                             sender = await title_elem.text_content() or "Unknown"
+                            sender = sender.strip()
                             if sender and sender != "Unknown":
                                 break
 
-                    # Skip if already processed this sender
-                    if sender in processed_senders:
+                    if not sender or sender == "Unknown":
                         continue
 
-                    # Check for unread indicator (multiple methods)
-                    has_unread = False
-                    unread_count = ""
-
-                    # Method 1: Check for unread badge
-                    for unread_selector in [
-                        'span[aria-label*="unread"]',
-                        'span[data-testid="icon-unread-count"]',
-                        'span[class*="unread"]',
-                        'div[class*="unread"]'
-                    ]:
-                        unread_elem = await chat.query_selector(unread_selector)
-                        if unread_elem:
-                            has_unread = True
-                            unread_count = await unread_elem.text_content() or "1"
-                            logger.info(f"[WATCHER] Unread badge found: {unread_count} from {sender}")
+                    # Get timestamp of last message in this chat
+                    last_msg_time = ""
+                    for time_selector in ['span[data-testid="last-msg-status"]', 'div[class*="time"]', 'span[class*="time"]']:
+                        time_elem = await chat.query_selector(time_selector)
+                        if time_elem:
+                            last_msg_time = await time_elem.text_content() or ""
                             break
 
-                    # Method 2: Check for green dot/indicator (even if no number)
-                    if not has_unread:
-                        for dot_selector in [
-                            'span[data-testid="status-v3-unread"]',
-                            'span[data-icon="status-v3-unread"]',
-                            'span[class*="x1c4vz4f"]'
-                        ]:
-                            dot_elem = await chat.query_selector(dot_selector)
-                            if dot_elem:
-                                has_unread = True
-                                logger.info(f"[WATCHER] Unread dot found from: {sender}")
-                                break
+                    # Create unique key for this chat's last message
+                    chat_key = f"{sender}_{last_msg_time}"
 
-                    # Method 3: Check for any visual indicator in the HTML
-                    if not has_unread:
-                        chat_html = await chat.evaluate('el => el.outerHTML')
-                        if 'unread' in chat_html.lower() or 'unseen' in chat_html.lower():
-                            has_unread = True
-                            logger.info(f"[WATCHER] Unread detected in HTML from: {sender}")
+                    # Check if this sender was already seen at startup
+                    sender_seen_at_startup = sender in self.initial_chats
 
-                    if not has_unread:
+                    # Skip if we've seen this exact state before
+                    if chat_key in self.processed_messages:
                         continue
 
-                    # Skip if this sender was already present when system started
-                    if sender in self.initial_chats:
-                        logger.debug(f"[WATCHER] Skipping existing chat from startup: {sender}")
+                    # If sender was seen at startup and this is first scan, skip it
+                    # (it's an old message, not a new one)
+                    if sender_seen_at_startup and len(self.processed_messages) <= len(self.initial_chats):
+                        # Mark it as processed so we don't see it again
+                        self.processed_messages.add(chat_key)
                         continue
 
-                    logger.info(f"[WATCHER] Processing NEW message from chat {i+1}: {sender}")
-                    processed_senders.add(sender)
+                    # NEW MESSAGE DETECTED
+                    logger.info(f"[WATCHER] NEW message from: {sender}")
 
-                    # Click chat
+                    # Click chat to open it
                     await chat.click()
-                    await asyncio.sleep(3)
+                    await asyncio.sleep(2)
 
-                    # Get last message - try multiple selectors
+                    # Get the actual last message content
                     last_message = ""
-                    for msg_selector in ['div.message-in', 'div[class*="message-in"]', 'div._amk4']:
-                        messages = await self.page.query_selector_all(msg_selector)
+
+                    # Try to get messages from the conversation
+                    msg_selectors = ['div.message-in', 'div[class*="message-in"]', 'div._amk4', 'div._amk6']
+                    for msg_sel in msg_selectors:
+                        messages = await self.page.query_selector_all(msg_sel)
                         if messages:
                             # Get the last incoming message
-                            for msg in reversed(messages[-5:]):  # Check last 5
-                                for text_selector in ['span.selectable-text', 'span[class*="selectable"]', 'div[class*="text"]']:
-                                    text_elem = await msg.query_selector(text_selector)
+                            for msg in reversed(messages[-3:]):
+                                text_selectors = ['span.selectable-text', 'span[class*="selectable"]', 'div[class*="text"]']
+                                for txt_sel in text_selectors:
+                                    text_elem = await msg.query_selector(txt_sel)
                                     if text_elem:
                                         text = await text_elem.text_content() or ""
-                                        if text and len(text) > 1:
-                                            last_message = text
+                                        if text and len(text.strip()) > 0:
+                                            last_message = text.strip()
                                             break
                                 if last_message:
                                     break
@@ -351,11 +323,19 @@ class UnifiedWhatsAppHITL:
                             break
 
                     if last_message:
-                        logger.info(f"[WATCHER] Message: {last_message[:50]}...")
+                        logger.info(f"[WATCHER] Message: {last_message[:60]}...")
+
+                        # Mark as processed
+                        self.processed_messages.add(chat_key)
+
+                        # Create task file
                         await self._create_task_file(sender, last_message)
                         new_count += 1
 
-                    # Go back to chat list
+                        # Add to initial chats so we don't process again
+                        self.initial_chats.add(sender)
+
+                    # Go back to chat list using Escape key
                     await self.page.keyboard.press("Escape")
                     await asyncio.sleep(1)
 
