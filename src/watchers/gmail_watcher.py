@@ -77,6 +77,7 @@ class GmailWatcher:
                 subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
                 sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown')
                 date_str = next((h['value'] for h in headers if h['name'].lower() == 'date'), '')
+                rfc_msg_id = next((h['value'] for h in headers if h['name'].lower() == 'message-id'), msg_id)
                 
                 thread_id = msg['threadId']
                 
@@ -89,7 +90,7 @@ class GmailWatcher:
 type: email
 id: "{msg_id}"
 thread_id: "{thread_id}"
-message_id: "{msg_id}"
+message_id: "{rfc_msg_id}"
 from: "{sender}"
 subject: "{subject}"
 received_at: "{date_str}"

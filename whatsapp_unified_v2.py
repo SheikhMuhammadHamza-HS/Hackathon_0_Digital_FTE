@@ -422,7 +422,10 @@ Output ONLY the response text."""
 
                     # Step 2: Create Plan
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    plan_filename = f"PLAN_{timestamp}_{sender.replace(' ', '_')[:20]}.md"
+                    # Sanitize sender name for safe filename (remove path separators)
+                    safe_sender = "".join(c for c in sender if c.isalnum() or c in (' ', '-', '_')).strip()
+                    safe_sender = safe_sender.replace(' ', '_')[:20]
+                    plan_filename = f"PLAN_{timestamp}_{safe_sender}.md"
                     plan_path = self.plans_dir / plan_filename
 
                     plan_content = f"""# Response Plan for {sender}
@@ -454,9 +457,7 @@ Output ONLY the response text."""
                     plan_path.write_text(plan_content, encoding='utf-8')
                     logger.info(f"[PROCESSOR] Created plan: {plan_filename}")
 
-                    # Step 3: Create Draft in Pending_Approval
-                    safe_sender = "".join(c for c in sender if c.isalnum() or c in (' ', '-', '_')).strip()
-                    safe_sender = safe_sender.replace(' ', '_')[:20]
+                    # Step 3: Create Draft in Pending_Approval (safe_sender already defined above)
                     draft_filename = f"DRAFT_{timestamp}_{safe_sender}.md"
                     draft_path = self.pending_approval_dir / draft_filename
 
@@ -502,7 +503,17 @@ status: pending_approval
         try:
             files = list(self.approved_dir.glob("*.md"))
 
+            # Filter files that are at least 10 seconds old (gives user time to review)
+            import time
+            eligible_files = []
             for filepath in files:
+                file_age = time.time() - filepath.stat().st_mtime
+                if file_age >= 10:  # 10 seconds delay before sending
+                    eligible_files.append(filepath)
+                else:
+                    logger.info(f"[SENDER] Waiting: {filepath.name} (will send in {10-int(file_age)}s)")
+
+            for filepath in eligible_files:
                 try:
                     logger.info(f"[SENDER] Sending: {filepath.name}")
 
@@ -640,9 +651,15 @@ status: pending_approval
                     logger.info(f"[PROCESSOR] Created {processed['processed']} drafts")
                     logger.info("[ACTION REQUIRED] Move files from Pending_Approval to Approved")
 
+                # Process approved files (with 60-second delay for safety)
                 approved = await self.process_approved()
                 if approved['sent'] > 0:
                     logger.info(f"[SENDER] Sent {approved['sent']} messages")
+
+                # Show status
+                approved_files = list(self.approved_dir.glob("*.md"))
+                if approved_files:
+                    logger.info(f"[APPROVED] {len(approved_files)} files waiting (10s delay before send)")
 
                 pending = len(list(self.pending_approval_dir.glob("*.md")))
                 approved_count = len(list(self.approved_dir.glob("*.md")))

@@ -125,13 +125,19 @@ class EmailSender:
         try:
             client = self.mcp_manager.get_client('email-mcp')
             if not client:
-                logger.warning("email-mcp client not available, falling back to mock mode")
+                logger.warning("email-mcp client not available, using mock mode (development only)")
                 return self._send_mock(parsed)
+
+            # Clean email address (extract 'email@example.com' from 'Name <email@example.com>')
+            import re
+            raw_to = parsed['to']
+            email_match = re.search(r'<(.+?)>', raw_to)
+            clean_to = email_match.group(1) if email_match else raw_to
 
             tool_name = 'send_email'
             args = {
-                'to': parsed['to'],
-                'subject': parsed['subject'],
+                'to': clean_to,
+                'subject': parsed['subject'] or '(No Subject)',
                 'body': parsed['body'],
                 'is_html': parsed.get('is_html', False)
             }
@@ -141,11 +147,9 @@ class EmailSender:
                 tool_name = 'reply_to_email'
                 args['threadId'] = parsed['thread_id']
                 args['messageId'] = parsed['message_id']
-                # Remove subject for replies as it's implied
-                if 'subject' in args:
-                    del args['subject']
+                # Keep subject - Gmail API raw send needs it in MIME even for replies
 
-            logger.info(f"Calling MCP tool {tool_name} for recipient {args['to']}")
+            logger.info(f"Calling MCP tool {tool_name} for recipient {clean_to}")
             result = client.call_tool(tool_name, args)
 
             if result and not result.get('isError'):
@@ -154,15 +158,15 @@ class EmailSender:
                     return True
                 else:
                     logger.error(f"MCP {tool_name} returned success but no content")
-                    return True # Assume success if no isError
+                    return True 
             else:
                 error_msg = result.get('content', [{}])[0].get('text', 'Unknown MCP error') if result else 'No result from MCP'
                 logger.error(f"MCP {tool_name} failed: {error_msg}")
-                return False
+                return False # Correctly return False on real error
 
         except Exception as e:
             logger.error("Failed to send via MCP: %s", e)
-            return False
+            return False # Correctly return False on exception
 
     def _send_mock(self, parsed: dict) -> bool:
         """Mock send for development/testing without MCP.

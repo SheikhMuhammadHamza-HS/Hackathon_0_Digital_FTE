@@ -42,16 +42,23 @@ async function initializeGmail() {
     }
 
     const tokenData = JSON.parse(tokenString);
-    // Ensure access_token is set (it might be in 'token' field)
-    if (tokenData.token && !tokenData.access_token) {
-      tokenData.access_token = tokenData.token;
-    }
 
-    const oauth2Client = new google.auth.OAuth2();
-    oauth2Client.setCredentials(tokenData);
+    // Initialize with client ID and secret for refresh capability
+    const oauth2Client = new google.auth.OAuth2(
+      tokenData.client_id,
+      tokenData.client_secret
+    );
+
+    // Map fields for google-auth-library compatibility
+    oauth2Client.setCredentials({
+      access_token: tokenData.token || tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      expiry_date: tokenData.expiry ? new Date(tokenData.expiry).getTime() : null,
+      scope: tokenData.scopes?.join(' ')
+    });
 
     gmailService = google.gmail({ version: 'v1', auth: oauth2Client });
-    console.error('Gmail service initialized successfully');
+    console.error('Gmail service initialized successfully (Token refresh enabled)');
     return true;
   } catch (error) {
     console.error('Failed to initialize Gmail service:', error);
@@ -115,6 +122,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'string',
               description: 'Recipient email address',
             },
+            subject: {
+              type: 'string',
+              description: 'Optional subject line',
+            },
             body: {
               type: 'string',
               description: 'Reply body content',
@@ -151,16 +162,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new Error('Missing required parameters: to, subject, body');
         }
 
-        // Manual MIME construction with CRLF and basic headers
+        // Normalize all line endings in body to \r\n to comply with rfc2822
+        const normalizedBody = body.replace(/\r?\n/g, '\r\n');
+
+        // Manual MIME construction with CRLF
         const str = [
           `To: ${to}`,
           `Subject: ${subject}`,
           'MIME-Version: 1.0',
-          `Content-Type: ${is_html ? 'text/html' : 'text/plain'}; charset=utf-8`,
-          'Content-Transfer-Encoding: 7bit',
+          `Content-Type: text/plain; charset=utf-8`,
           '',
-          body
+          normalizedBody
         ].join('\r\n');
+
+        console.error('Constructed MIME message for debugging:');
+        console.error('-------------------------------------------');
+        console.error(str);
+        console.error('-------------------------------------------');
 
         const rawMessage = Buffer.from(str)
           .toString('base64')
@@ -168,21 +186,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           .replace(/\//g, '_')
           .replace(/=+$/, '');
 
-        const response = await gmailService.users.messages.send({
-          userId: 'me',
-          requestBody: {
-            raw: rawMessage,
-          },
-        });
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Email sent successfully! Message ID: ${response.data.id}`,
+        try {
+          const response = await gmailService.users.messages.send({
+            userId: 'me',
+            requestBody: {
+              raw: rawMessage,
             },
-          ],
-        };
+          });
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Email sent successfully! Message ID: ${response.data.id}`,
+              },
+            ],
+          };
+        } catch (apiError) {
+          console.error('Gmail API Error Details:', JSON.stringify(apiError.response?.data || apiError, null, 2));
+          throw apiError;
+        }
       }
 
       case 'get_profile': {
@@ -206,22 +229,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'reply_to_email': {
-        const { threadId, messageId, to, body, is_html = false } = args;
+        const { threadId, messageId, to, subject, body, is_html = false } = args;
 
-        if (!threadId || !messageId || !to || !body) {
-          throw new Error('Missing required arguments');
+        if (!threadId || !to || !body) {
+          throw new Error('Missing required arguments: threadId, to, body');
         }
 
-        // Manual MIME construction with CRLF
-        const str = [
+        const normalizedBody = body.replace(/\r?\n/g, '\r\n');
+
+        // Extreme simplification: Just To, Subject, and Body
+        // Threading is handled by threadId in the requestBody
+        const headers = [
           `To: ${to}`,
+          `Subject: ${subject || 'Re: (No Subject)'}`,
           'MIME-Version: 1.0',
-          `Content-Type: ${is_html ? 'text/html' : 'text/plain'}; charset=utf-8`,
-          'Content-Transfer-Encoding: 7bit',
-          `In-Reply-To: ${messageId}`,
-          `References: ${messageId}`,
+          `Content-Type: text/plain; charset=utf-8`
+        ];
+
+        const str = [
+          ...headers,
           '',
-          body
+          normalizedBody
         ].join('\r\n');
 
         const rawMessage = Buffer.from(str)
@@ -230,22 +258,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           .replace(/\//g, '_')
           .replace(/=+$/, '');
 
-        const response = await gmailService.users.messages.send({
-          userId: 'me',
-          requestBody: {
-            raw: rawMessage,
-            threadId: threadId
-          },
-        });
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Reply sent successfully! New Message ID: ${response.data.id} in Thread: ${response.data.threadId}`,
+        try {
+          const response = await gmailService.users.messages.send({
+            userId: 'me',
+            requestBody: {
+              raw: rawMessage,
+              threadId: threadId
             },
-          ],
-        };
+          });
+
+          return {
+            content: [{
+              type: 'text',
+              text: `Reply sent successfully! ID: ${response.data.id}`,
+            }],
+          };
+        } catch (apiError) {
+          const detail = apiError.response?.data?.error?.message || apiError.message;
+          return {
+            content: [{
+              type: 'text',
+              text: `Error executing reply_to_email: ${detail}`,
+            }],
+            isError: true,
+          };
+        }
       }
 
       default:
