@@ -28,10 +28,25 @@ def setup_gmail():
     creds = flow.run_local_server(port=0)
     
     # Save the credentials for the next run
-    token_data = json.loads(creds.to_json())
+    token_json = creds.to_json()
+    token_data = json.loads(token_json)
     token_path = Path("token.json")
     token_path.write_text(json.dumps(token_data, indent=4))
     
+    # CRITICAL: Also update .env for MCP servers (they read from here, not token.json)
+    env_path = Path(".env")
+    if env_path.exists():
+        content = env_path.read_text(encoding='utf-8')
+        import re
+        # Single line token string for .env
+        token_str = json.dumps(token_data)
+        if "GMAIL_TOKEN=" in content:
+            new_content = re.sub(r'GMAIL_TOKEN=.*', f'GMAIL_TOKEN={token_str}', content)
+        else:
+            new_content = content + f'\nGMAIL_TOKEN={token_str}'
+        env_path.write_text(new_content, encoding='utf-8')
+        print("✓ Updated .env with new GMAIL_TOKEN (Synchronized)")
+
     print("\nSuccess! ✅")
     print(f"Token saved to: {token_path}")
     print("You can now start the agent, and it will monitor your real Gmail inbox.")
