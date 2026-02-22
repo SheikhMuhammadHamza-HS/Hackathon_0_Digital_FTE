@@ -6,7 +6,8 @@
       "WebFetch(domain:www.odoo.com)",
       "WebFetch(domain:github.com)",
       "Bash(python -m pytest tests/integration/test_circuit_breaker.py -k \"test_circuit_breaker_initial_state\" -v)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(cd D:\\\\hackathon_zero:*)"
     ]
   }
 }

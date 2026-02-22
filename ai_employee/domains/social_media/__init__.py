@@ -5,6 +5,7 @@ from .models import SocialPost, BrandMention, Platform, ContentType, PostStatus
 from .twitter_adapter import TwitterAdapter
 from .facebook_adapter import FacebookAdapter, InstagramAdapter
 from .linkedin_adapter import LinkedInAdapter
+from .rate_limiter import RateLimiter, AdaptiveRateLimiter, RateLimitConfig
 
 __all__ = [
     'SocialMediaAdapter',
@@ -16,5 +17,8 @@ __all__ = [
     'BrandMention',
     'Platform',
     'ContentType',
-    'PostStatus'
+    'PostStatus',
+    'RateLimiter',
+    'AdaptiveRateLimiter',
+    'RateLimitConfig'
 ]
