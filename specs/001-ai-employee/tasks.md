@@ -167,8 +167,8 @@ description: "Task list for AI Employee system implementation"
 - [x] T056 [US2] Create social media events in ai_employee/domains/social_media/events.py
 - [x] T057 [US2] Implement sentiment analysis for mentions
 - [x] T058 [US2] Add social media API endpoints in main.py
-- [ ] T059 [US2] Add rate limiting management for social platforms
-- [ ] T060 [US2] Implement content adaptation per platform
+- [x] T059 [US2] Add rate limiting management for social platforms
+- [x] T060 [US2] Implement content adaptation per platform
 
 **Checkpoint**: At this point, User Stories 1, 2, AND 4 should all work independently
 
