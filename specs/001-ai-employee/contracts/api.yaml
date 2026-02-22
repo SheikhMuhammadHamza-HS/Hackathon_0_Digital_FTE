@@ -1,0 +1,566 @@
+openapi: 3.0.3
+info:
+  title: AI Employee System API
+  description: RESTful API for the autonomous AI Employee system
+  version: 1.0.0
+  contact:
+    name: AI Employee System
+    email: admin@company.com
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Development server
+
+paths:
+  /invoices:
+    get:
+      summary: List all invoices
+      tags:
+        - Invoices
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, posted, paid, cancelled]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of invoices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invoices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Invoice'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+    post:
+      summary: Create a new invoice
+      tags:
+        - Invoices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceRequest'
+      responses:
+        '201':
+          description: Invoice created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /invoices/{invoice_id}:
+    get:
+      summary: Get invoice by ID
+      tags:
+        - Invoices
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Invoice details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '404':
+          description: Invoice not found
+
+    post:
+      summary: Post invoice to accounting system
+      tags:
+        - Invoices
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Invoice posted successfully
+        '400':
+          description: Invoice cannot be posted (requires approval)
+        '404':
+          description: Invoice not found
+
+  /payments:
+    get:
+      summary: List all payments
+      tags:
+        - Payments
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, reconciled, rejected]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: List of payments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Payment'
+                  total:
+                    type: integer
+
+    post:
+      summary: Create a new payment
+      tags:
+        - Payments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: Payment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+
+  /social-media/posts:
+    get:
+      summary: List social media posts
+      tags:
+        - Social Media
+      parameters:
+        - name: platform
+          in: query
+          schema:
+            type: string
+            enum: [twitter, facebook, instagram, linkedin]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, scheduled, posted, failed]
+      responses:
+        '200':
+          description: List of posts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SocialPost'
+
+    post:
+      summary: Create a new social media post
+      tags:
+        - Social Media
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePostRequest'
+      responses:
+        '201':
+          description: Post created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialPost'
+
+  /reports/ceo-briefing:
+    get:
+      summary: Generate CEO briefing
+      tags:
+        - Reports
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [weekly, monthly, quarterly]
+            default: weekly
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, pdf, markdown]
+            default: markdown
+      responses:
+        '200':
+          description: CEO briefing generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CEOBriefing'
+
+  /health:
+    get:
+      summary: System health check
+      tags:
+        - System
+      responses:
+        '200':
+          description: System health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+components:
+  schemas:
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoice_number:
+          type: string
+        client_id:
+          type: string
+          format: uuid
+        issue_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [draft, posted, paid, cancelled]
+        subtotal:
+          type: number
+          format: decimal
+        tax_amount:
+          type: number
+          format: decimal
+        total_amount:
+          type: number
+          format: decimal
+        line_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceLineItem'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    InvoiceLineItem:
+      type: object
+      properties:
+        description:
+          type: string
+        quantity:
+          type: number
+        unit_price:
+          type: number
+          format: decimal
+        total_price:
+          type: number
+          format: decimal
+        tax_rate:
+          type: number
+          format: decimal
+
+    CreateInvoiceRequest:
+      type: object
+      required:
+        - client_id
+        - line_items
+      properties:
+        client_id:
+          type: string
+          format: uuid
+        issue_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        line_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceLineItem'
+        notes:
+          type: string
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoice_id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: decimal
+        payment_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [pending, approved, reconciled, rejected]
+        payment_method:
+          type: string
+        bank_reference:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreatePaymentRequest:
+      type: object
+      required:
+        - invoice_id
+        - amount
+        - payment_date
+      properties:
+        invoice_id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: decimal
+        payment_date:
+          type: string
+          format: date
+        payment_method:
+          type: string
+        bank_reference:
+          type: string
+
+    SocialPost:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        platform:
+          type: string
+          enum: [twitter, facebook, instagram, linkedin]
+        content:
+          type: string
+        status:
+          type: string
+          enum: [draft, scheduled, posted, failed]
+        scheduled_at:
+          type: string
+          format: date-time
+        posted_at:
+          type: string
+          format: date-time
+        media_urls:
+          type: array
+          items:
+            type: string
+        metrics:
+          $ref: '#/components/schemas/SocialMetrics'
+        created_at:
+          type: string
+          format: date-time
+
+    CreatePostRequest:
+      type: object
+      required:
+        - platform
+        - content
+      properties:
+        platform:
+          type: string
+          enum: [twitter, facebook, instagram, linkedin]
+        content:
+          type: string
+        scheduled_at:
+          type: string
+          format: date-time
+        media_urls:
+          type: array
+          items:
+            type: string
+
+    SocialMetrics:
+      type: object
+      properties:
+        likes:
+          type: integer
+        shares:
+          type: integer
+        comments:
+          type: integer
+        impressions:
+          type: integer
+        engagement_rate:
+          type: number
+          format: decimal
+
+    CEOBriefing:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        period:
+          type: string
+        generated_at:
+          type: string
+          format: date-time
+        financial_summary:
+          $ref: '#/components/schemas/FinancialSummary'
+        operational_metrics:
+          $ref: '#/components/schemas/OperationalMetrics'
+        social_media_summary:
+          $ref: '#/components/schemas/SocialMediaSummary'
+        recommendations:
+          type: array
+          items:
+            type: string
+
+    FinancialSummary:
+      type: object
+      properties:
+        revenue:
+          type: number
+          format: decimal
+        expenses:
+          type: number
+          format: decimal
+        profit:
+          type: number
+          format: decimal
+        outstanding_invoices:
+          type: number
+          format: decimal
+        cash_balance:
+          type: number
+          format: decimal
+
+    OperationalMetrics:
+      type: object
+      properties:
+        tasks_completed:
+          type: integer
+        tasks_pending:
+          type: integer
+        system_uptime:
+          type: number
+          format: decimal
+        error_rate:
+          type: number
+          format: decimal
+
+    SocialMediaSummary:
+      type: object
+      properties:
+        total_posts:
+          type: integer
+        engagement_rate:
+          type: number
+          format: decimal
+        follower_growth:
+          type: number
+          format: decimal
+        top_performing_post:
+          $ref: '#/components/schemas/SocialPost'
+
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        services:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ServiceHealth'
+
+    ServiceHealth:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [up, down, degraded]
+        response_time:
+          type: number
+          format: decimal
+        last_check:
+          type: string
+          format: date-time
+        error_message:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []
