@@ -30,3 +30,24 @@ This document defines the rules and behaviors for the Digital FTE agent.
 - If Claude Code API is unavailable, queue files for later processing
 - Log all errors for diagnostic purposes
 - Notify user if processing fails repeatedly
+
+## Data Retention Policy
+
+### Retention Periods
+- **Logs**: All system logs kept for minimum 2 years
+- **Invoices**: Invoice records retained for 2 years for tax compliance
+- **Briefings**: CEO briefings archived for 2 years for historical reference
+- **Approval Records**: All approval decisions kept for 2 years for audit purposes
+- **Temporary Files**: Purged automatically after 7 days
+
+### Data Purging
+- System automatically removes temporary files after 7-day retention period
+- Archive old records to compressed storage after 1 year
+- Secure deletion of sensitive data after retention period expires
+- Maintain index of purged records for compliance verification
+
+### Compliance Notes
+- 2-year retention meets standard business record requirements
+- Temporary file cleanup prevents system storage overflow
+- Audit trail maintained for full retention period
+- Data access logged throughout retention lifecycle

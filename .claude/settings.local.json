@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.specify/scripts/bash/create-phr.sh --title \"AI Employee Specification\" --stage spec --feature \"001-ai-employee\" --json)",
+      "WebSearch",
+      "WebFetch(domain:www.odoo.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(python -m pytest tests/integration/test_circuit_breaker.py -k \"test_circuit_breaker_initial_state\" -v)",
+      "Bash(pip install:*)"
+    ]
+  }
+}

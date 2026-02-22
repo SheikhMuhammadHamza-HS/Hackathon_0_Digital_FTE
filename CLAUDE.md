@@ -212,6 +212,8 @@ See `.specify/memory/constitution.md` for code quality, testing, performance, se
 ## Active Technologies
 - Python 3.10+ (as specified in feature requirements) + watchdog (for file monitoring), python-dotenv (for env loading), os/pathlib (for file operations) (001-mva-agent)
 - File-based storage using local filesystem (folders: /Inbox, /Needs_Action, /Done, /Logs) (001-mva-agent)
+- Python 3.11+ + asyncio, aiohttp, python-dotenv, watchdog, odoo-client libraries, social platform SDKs (001-ai-employee)
+- File-based storage system with Obsidian vault integration + Odoo PostgreSQL (001-ai-employee)
 
 ## Recent Changes
 - 001-mva-agent: Added Python 3.10+ (as specified in feature requirements) + watchdog (for file monitoring), python-dotenv (for env loading), os/pathlib (for file operations)
