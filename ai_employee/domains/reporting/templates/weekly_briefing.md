@@ -1,0 +1,149 @@
+---
+briefing_date: {{ briefing_date }}
+week_number: {{ week_number }}
+period: {{ start_date }} to {{ end_date }}
+generated_by: {{ generated_by }}
+generated_at: {{ generated_at }}
+---
+
+# CEO Briefing - Week of {{ week_name }}
+
+## Executive Summary
+📊 **Weekly Revenue:** ${{ financial.total_revenue | format_number }} ({{ financial.revenue_variance_pct | format_percent }} of target)
+📈 **MTD Revenue:** ${{ financial.mtd_revenue | format_number }} ({{ financial.mtd_completion_pct | format_percent }} of {{ month_name }} target)
+✅ **Tasks Completed:** {{ operational.total_tasks_completed }}/{{ operational.total_tasks }} ({{ operational.completion_rate | format_percent }} completion rate)
+⚠️ **Bottlenecks:** {{ bottlenecks.count }} tasks exceeded SLA
+💡 **Proactive Suggestions:** {{ suggestions.count }} items for review
+
+---
+
+## Financial Performance
+
+### Revenue Analysis
+| Metric | This Week | Target | Variance |
+|--------|-----------|--------|----------|
+| **Revenue** | ${{ financial.total_revenue | format_number }} | ${{ financial.weekly_target | format_number }} | ${{ financial.revenue_variance | format_number }} |
+| **Invoices Sent** | {{ financial.invoices_sent }} | {{ financial.invoices_target }} | {{ financial.invoices_variance }} |
+| **Payments Received** | ${{ financial.payments_received | format_number }} | ${{ financial.payments_target | format_number }} | ${{ financial.payments_variance | format_number }} |
+| **Outstanding** | ${{ financial.outstanding | format_number }} | - | - |
+
+### Month-to-Date Progress
+- **{{ month_name }} Target:** ${{ financial.monthly_target | format_number }}
+- **Current MTD:** ${{ financial.mtd_revenue | format_number }} ({{ financial.mtd_completion_pct | format_percent }})
+- **Remaining Needed:** ${{ financial.mtd_remaining | format_number }} ({{ financial.mtd_remaining_pct | format_percent }})
+- **Daily Run Rate Needed:** ${{ financial.daily_run_rate | format_number }}
+
+### Cash Flow Summary
+- **Starting Balance:** ${{ cash_flow.starting_balance | format_number }}
+- **Inflows:** +${{ cash_flow.inflows | format_number }}
+- **Outflows:** -${{ cash_flow.outflows | format_number }}
+- **Ending Balance:** ${{ cash_flow.ending_balance | format_number }}
+
+---
+
+## Operational Performance
+
+### Task Completion
+| Status | Count | Percentage |
+|--------|-------|------------|
+| **Completed** | {{ operational.completed_tasks }} | {{ operational.completion_rate | format_percent }} |
+| **In Progress** | {{ operational.in_progress_tasks }} | {{ operational.in_progress_pct | format_percent }} |
+| **Failed** | {{ operational.failed_tasks }} | {{ operational.failed_pct | format_percent }} |
+
+### Bottleneck Analysis
+{% for bottleneck in bottlenecks.items %}
+{{ loop.index }}. **{{ bottleneck.task }}** - {{ bottleneck.duration }} (SLA: {{ bottleneck.sla }})
+   - Cause: {{ bottleneck.cause }}
+   - Impact: {{ bottleneck.impact }}
+   - Action: {{ bottleneck.action }}
+
+{% endfor %}
+
+---
+
+## Social Media Performance
+
+### Engagement Overview
+| Platform | Posts | Engagement | Avg. per Post |
+|----------|-------|------------|---------------|
+{% for platform, data in social.platform_breakdown.items() %}
+| **{{ platform }}** | {{ data.posts }} | {{ data.engagement }} | {{ data.avg_engagement | format_number }} |
+{% endfor %}
+
+### Top Performing Content
+{% for content in social.top_content %}
+{{ loop.index }}. **{{ content.platform }}** - {{ content.content | truncate(50) }}
+   - Engagement: {{ content.engagement }}
+   - Sentiment: {{ content.sentiment | format_percent }}
+
+{% endfor %}
+
+---
+
+## Subscription & Expense Audit
+
+### Active Subscriptions
+| Service | Cost | Usage | Status |
+|---------|------|-------|---------|
+{% for sub in subscriptions %}
+| **{{ sub.service }}** | ${{ sub.cost }}/month | {{ sub.usage }} | {{ sub.status_icon }} {{ sub.status }} |
+{% endfor %}
+
+**Recommendations:**
+{% for rec in subscription_recommendations %}
+- **{{ rec.action }}:** {{ rec.service }} ({{ rec.reason }})
+{% endfor %}
+
+---
+
+## Upcoming Deadlines
+
+### This Week
+{% for deadline in upcoming_deadlines.this_week %}
+- **{{ deadline.day }}:** {{ deadline.title }}
+{% endfor %}
+
+### Next Week
+{% for deadline in upcoming_deadlines.next_week %}
+- **{{ deadline.day }}:** {{ deadline.title }}
+{% endfor %}
+
+---
+
+## Proactive Suggestions
+
+### High Priority Items
+{% for suggestion in suggestions.high_priority %}
+{{ loop.index }}. **{{ suggestion.title }}**
+   - {{ suggestion.description }}
+   - **Expected Impact:** {{ suggestion.impact }}
+   - **File:** {{ suggestion.file }}
+
+{% endfor %}
+
+### Strategic Insights
+{% for insight in strategic_insights %}
+- **{{ insight.area }}:** {{ insight.description }}
+{% endfor %}
+
+---
+
+## Risk Factors & Mitigation
+
+{% for risk in risk_factors %}
+{{ loop.index }}. **{{ risk.title }}**
+   - **Risk:** {{ risk.description }}
+   - **Mitigation:** {{ risk.mitigation }}
+
+{% endfor %}
+
+---
+
+## Next Week Focus
+{% for item in next_week_focus %}
+{{ loop.index }}. {{ item }}
+{% endfor %}
+
+---
+*Generated by {{ generated_by }} on {{ generated_at }}*
+*Next briefing: {{ next_briefing_date }}*
