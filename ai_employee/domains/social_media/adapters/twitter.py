@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from typing import Dict, Any, Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from urllib.parse import quote
 
 import aiohttp
@@ -164,7 +164,7 @@ class TwitterAdapter(SocialMediaAdapter):
                             "post_id": tweet_id,
                             "platform": "twitter",
                             "status": "posted",
-                            "published_at": datetime.utcnow().isoformat(),
+                            "published_at": datetime.now(timezone.utc).isoformat(),
                             "url": f"https://twitter.com/{self.username}/status/{tweet_id}",
                             "text": content[:280]
                         }
@@ -194,12 +194,12 @@ class TwitterAdapter(SocialMediaAdapter):
             Scheduled tweet information
         """
         # Validate scheduled time
-        if scheduled_time <= datetime.utcnow():
+        if scheduled_time <= datetime.now(timezone.utc):
             raise ValueError("Scheduled time must be in the future")
 
         # For now, we'll create a scheduled post record
         # In a real implementation, this would integrate with a job scheduler
-        schedule_id = f"tw_sched_{datetime.utcnow().timestamp()}"
+        schedule_id = f"tw_sched_{datetime.now(timezone.utc).timestamp()}"
 
         return {
             "post_id": schedule_id,
@@ -208,7 +208,7 @@ class TwitterAdapter(SocialMediaAdapter):
             "scheduled_time": scheduled_time.isoformat(),
             "content": content[:280],
             "media_urls": media_urls or [],
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
 
     async def get_post(self, post_id: str) -> Dict[str, Any]:
@@ -301,7 +301,7 @@ class TwitterAdapter(SocialMediaAdapter):
                             "post_id": post_id,
                             "platform": "twitter",
                             "status": "deleted",
-                            "deleted_at": datetime.utcnow().isoformat()
+                            "deleted_at": datetime.now(timezone.utc).isoformat()
                         }
                     else:
                         error_data = await response.json()
@@ -383,7 +383,7 @@ class TwitterAdapter(SocialMediaAdapter):
                             "mentions": mentions,
                             "total_count": len(mentions),
                             "new_count": len(mentions),
-                            "last_checked": datetime.utcnow().isoformat(),
+                            "last_checked": datetime.now(timezone.utc).isoformat(),
                             "next_token": data.get("meta", {}).get("next_token")
                         }
                     else:
@@ -431,7 +431,7 @@ class TwitterAdapter(SocialMediaAdapter):
                 "endpoint": endpoint,
                 "limit": limiter.calls_per_window,
                 "remaining": limiter.calls_per_window - len(limiter.calls),
-                "reset_time": (datetime.utcnow() + timedelta(seconds=wait_time)).isoformat() if wait_time > 0 else None,
+                "reset_time": (datetime.now(timezone.utc) + timedelta(seconds=wait_time)).isoformat() if wait_time > 0 else None,
                 "retry_after": wait_time if wait_time > 0 else 0
             }
         else:
@@ -468,21 +468,21 @@ class TwitterAdapter(SocialMediaAdapter):
                     "timestamp": tweet_data.get("created_at"),
                     "conversation_id": tweet_data.get("conversation_id")
                 },
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
         elif event_type == "follow":
             return {
                 "event_type": "follow",
                 "platform": "twitter",
                 "data": payload,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
         return {
             "event_type": "unknown",
             "platform": "twitter",
             "data": payload,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     async def _upload_media(self, media_urls: List[str]) -> List[str]:

@@ -1,7 +1,7 @@
 import threading
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 
 from ..config import settings
@@ -27,7 +27,11 @@ class DashboardUpdater:
     MAX_SIZE_BYTES = 1 * 1024 * 1024  # 1 MiB – rotate before it gets large
 
     def __init__(self, dashboard_path: str | Path = None):
-        self.dashboard_path = Path(dashboard_path) if dashboard_path else Path(settings.DASHBOARD_PATH)
+        if dashboard_path:
+            self.dashboard_path = Path(dashboard_path)
+        else:
+            # Use absolute path from project root
+            self.dashboard_path = Path(settings.BASE_DIR) / settings.DASHBOARD_PATH
         ensure_directory_exists(self.dashboard_path.parent)
         # Ensure the file exists and has a header
         if not self.dashboard_path.exists():
@@ -42,7 +46,7 @@ class DashboardUpdater:
     def _rotate_if_necessary(self):
         try:
             if self.dashboard_path.stat().st_size >= self.MAX_SIZE_BYTES:
-                timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+                timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
                 archive_name = self.dashboard_path.with_name(f"Dashboard_{timestamp}.md")
                 self.dashboard_path.rename(archive_name)
                 logger.info("Dashboard rotated to %s", archive_name)
@@ -60,7 +64,7 @@ class DashboardUpdater:
         status: str
             Outcome status, typically "SUCCESS" or "FAILURE".
         """
-        timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%SZ")
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
         row = f"| {timestamp} | {task} | {status} |\n"
         with _lock:
             try:

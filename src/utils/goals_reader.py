@@ -18,8 +18,8 @@ def _load_goals_file() -> str:
     a ``FileProcessingException`` is raised so callers can handle the error.
     """
     # Default location is the repository root
-    default_path = Path('Business_Goals.md')
-    path = Path(settings.COMPANY_HANDBOOK_PATH) if getattr(settings, 'COMPANY_HANDBOOK_PATH', None) else default_path
+    default_path = Path(settings.BASE_DIR) / 'Business_Goals.md'
+    path = Path(settings.BASE_DIR) / settings.COMPANY_HANDBOOK_PATH if getattr(settings, 'COMPANY_HANDBOOK_PATH', None) else default_path
     if not path.is_file():
         path = default_path
     try:

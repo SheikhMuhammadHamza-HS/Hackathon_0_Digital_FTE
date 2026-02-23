@@ -10,7 +10,7 @@ import psutil
 import signal
 import time
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Callable, Union, Tuple
@@ -408,8 +408,8 @@ class ProcessWatchdog:
             process_info.pid = process.pid
             process_info.process = psutil_process
             process_info.status = ProcessStatus.RUNNING
-            process_info.start_time = datetime.utcnow()
-            process_info.last_heartbeat = datetime.utcnow()
+            process_info.start_time = datetime.now(timezone.utc)
+            process_info.last_heartbeat = datetime.now(timezone.utc)
 
             # Start monitoring task
             if name not in self._process_tasks or self._process_tasks[name].done():
@@ -492,7 +492,7 @@ class ProcessWatchdog:
 
         # Update status
         process_info.status = ProcessStatus.RESTARTING
-        process_info.last_restart = datetime.utcnow()
+        process_info.last_restart = datetime.now(timezone.utc)
 
         # Wait a bit
         await asyncio.sleep(1)
@@ -507,7 +507,7 @@ class ProcessWatchdog:
             # Record restart history
             history = RestartHistory(
                 process_name=name,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 reason=reason,
                 restart_time=restart_time,
                 successful=True
@@ -534,7 +534,7 @@ class ProcessWatchdog:
             # Record failure
             history = RestartHistory(
                 process_name=name,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 reason=reason,
                 successful=False
             )
@@ -609,7 +609,7 @@ class ProcessWatchdog:
 
                 # Calculate uptime
                 if process_info.start_time:
-                    process_info.uptime = (datetime.utcnow() - process_info.start_time).total_seconds()
+                    process_info.uptime = (datetime.now(timezone.utc) - process_info.start_time).total_seconds()
             except psutil.NoSuchProcess:
                 process_info.status = ProcessStatus.CRASHED
                 process_info.process = None
@@ -659,12 +659,12 @@ class ProcessWatchdog:
             # If no history, check current process
             process = await self.get_process_status(name)
             if process and process.status == ProcessStatus.RUNNING and process.start_time:
-                uptime = (datetime.utcnow() - process.start_time).total_seconds()
+                uptime = (datetime.now(timezone.utc) - process.start_time).total_seconds()
                 return min(100.0, (uptime / (hours * 3600)) * 100)
             return 0.0
 
         # Calculate from history
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         recent_history = [h for h in history if h.timestamp > cutoff]
 
         if not recent_history:
@@ -736,7 +736,7 @@ class ProcessWatchdog:
             if cpu_percent > 95.0:
                 # Check how long it's been running
                 if process_info.start_time:
-                    runtime = (datetime.utcnow() - process_info.start_time).total_seconds()
+                    runtime = (datetime.now(timezone.utc) - process_info.start_time).total_seconds()
                     if runtime > 300:  # 5 minutes
                         self.logger.warning(f"Process '{name}' might be hanging (CPU: {cpu_percent}%)")
                         process_info.status = ProcessStatus.HANGING
@@ -935,7 +935,7 @@ class ProcessWatchdog:
         try:
             if config.check_type == HealthCheckType.HEARTBEAT:
                 # Update heartbeat timestamp
-                process_info.last_heartbeat = datetime.utcnow()
+                process_info.last_heartbeat = datetime.now(timezone.utc)
                 metrics["heartbeat"] = 1.0
 
             elif config.check_type == HealthCheckType.CPU_USAGE:
@@ -1127,7 +1127,7 @@ class ProcessWatchdog:
 
                 for name, process_info in self._processes.items():
                     if process_info.status == ProcessStatus.RUNNING and process_info.start_time:
-                        uptime = (datetime.utcnow() - process_info.start_time).total_seconds()
+                        uptime = (datetime.now(timezone.utc) - process_info.start_time).total_seconds()
                         total_uptime += uptime
                         running_count += 1
 
@@ -1148,7 +1148,7 @@ class ProcessWatchdog:
         while not self._shutdown_event.is_set():
             try:
                 # Clean old restart history (keep last 7 days)
-                cutoff = datetime.utcnow() - timedelta(days=7)
+                cutoff = datetime.now(timezone.utc) - timedelta(days=7)
                 while self._restart_history and self._restart_history[0].timestamp < cutoff:
                     self._restart_history.popleft()
 
@@ -1188,7 +1188,7 @@ class ProcessWatchdog:
             data = {
                 "processes": [],
                 "stats": self._stats,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
             for name, process_info in self._processes.items():

@@ -10,7 +10,7 @@ is raised so callers can handle the error appropriately.
 
 from pathlib import Path
 
-from ..config.settings import COMPANY_HANDBOOK_PATH
+from ..config.settings import settings
 from ..exceptions import FileProcessingException
 
 
@@ -28,9 +28,10 @@ def load_handbook() -> str:
         If the handbook file is missing or cannot be read.
     """
 
-    path = Path(COMPANY_HANDBOOK_PATH)
+    # Use absolute path from project root
+    path = Path(settings.BASE_DIR) / settings.COMPANY_HANDBOOK_PATH
     if not path.is_file():
-        raise FileProcessingException(f"Handbook file not found at {COMPANY_HANDBOOK_PATH}")
+        raise FileProcessingException(f"Handbook file not found at {path}")
     try:
         return path.read_text(encoding="utf-8")
     except Exception as e:

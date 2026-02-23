@@ -1,7 +1,7 @@
 """Models for social media domain."""
 
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from dataclasses import dataclass, field
 
@@ -109,7 +109,7 @@ class SocialPost(BaseEntity):
             raise ValueError(f"Cannot publish post in {self.status} status")
 
         self.status = PostStatus.POSTED
-        self.published_at = datetime.utcnow()
+        self.published_at = datetime.now(timezone.utc)
         self.update_timestamp()
 
     def cancel(self) -> None:
@@ -207,7 +207,7 @@ class BrandMention(BaseEntity):
         self.response_id = response_id
         self.response_content = response_content
         self.response_status = "responded"
-        self.responded_at = datetime.utcnow()
+        self.responded_at = datetime.now(timezone.utc)
         self.update_timestamp()
 
     def escalate(self) -> None:

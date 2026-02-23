@@ -13,7 +13,7 @@ Contract tests ensure that:
 
 import pytest
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from unittest.mock import Mock, AsyncMock, MagicMock, patch
 from typing import List, Dict, Optional, Any
@@ -45,7 +45,7 @@ class TestSocialMediaContracts:
         return {
             "platform": "twitter",
             "content": "Check out our new AI Employee system! #AI #Automation",
-            "scheduled_time": datetime.utcnow() + timedelta(minutes=30),
+            "scheduled_time": datetime.now(timezone.utc) + timedelta(minutes=30),
             "media_urls": ["https://example.com/image.jpg"],
             "tags": ["#AI", "#Automation", "#Productivity"],
             "metadata": {
@@ -62,7 +62,7 @@ class TestSocialMediaContracts:
             "mention_id": "mention_123",
             "author": "tech_enthusiast",
             "content": "@AIEmployee how does the system handle errors?",
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(timezone.utc),
             "sentiment": "neutral",
             "response_status": "pending"
         }
@@ -83,7 +83,7 @@ class TestSocialMediaContracts:
             "post_id": expected_post_id,
             "platform": "twitter",
             "status": "posted",
-            "published_at": datetime.utcnow().isoformat(),
+            "published_at": datetime.now(timezone.utc).isoformat(),
             "url": "https://twitter.com/user/status/123456"
         }
 
@@ -110,7 +110,7 @@ class TestSocialMediaContracts:
         schedule_request = {
             "content": "Scheduled post content",
             "platform": "linkedin",
-            "scheduled_time": datetime.utcnow() + timedelta(hours=2),
+            "scheduled_time": datetime.now(timezone.utc) + timedelta(hours=2),
             "timezone": "UTC"
         }
 
@@ -120,7 +120,7 @@ class TestSocialMediaContracts:
             "platform": "linkedin",
             "status": "scheduled",
             "scheduled_time": schedule_request["scheduled_time"].isoformat(),
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
 
         # Mock the platform response
@@ -154,8 +154,8 @@ class TestSocialMediaContracts:
                 "comments": 8,
                 "impressions": 1250
             },
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
         }
 
         # Mock the platform response
@@ -182,7 +182,7 @@ class TestSocialMediaContracts:
         expected_response = {
             "post_id": post_id,
             "status": "deleted",
-            "deleted_at": datetime.utcnow().isoformat()
+            "deleted_at": datetime.now(timezone.utc).isoformat()
         }
 
         # Mock the platform response
@@ -201,7 +201,7 @@ class TestSocialMediaContracts:
         """Contract: Mention monitoring returns structured mention data."""
         # Given monitoring parameters
         keywords = ["@AIEmployee", "#AIEmployee"]
-        since = datetime.utcnow() - timedelta(hours=1)
+        since = datetime.now(timezone.utc) - timedelta(hours=1)
 
         # Expected response contract
         expected_response = {
@@ -211,7 +211,7 @@ class TestSocialMediaContracts:
                     "platform": "twitter",
                     "author": "user1",
                     "content": "@AIEmployee great work on the automation!",
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "url": "https://twitter.com/user1/status/123",
                     "sentiment": "positive",
                     "response_status": "unresponded"
@@ -221,7 +221,7 @@ class TestSocialMediaContracts:
                     "platform": "twitter",
                     "author": "user2",
                     "content": "Having issues with #AIEmployee setup",
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "url": "https://twitter.com/user2/status/124",
                     "sentiment": "negative",
                     "response_status": "escalated"
@@ -229,7 +229,7 @@ class TestSocialMediaContracts:
             ],
             "total_count": 2,
             "new_count": 2,
-            "last_checked": datetime.utcnow().isoformat()
+            "last_checked": datetime.now(timezone.utc).isoformat()
         }
 
         # Mock the platform response
@@ -268,7 +268,7 @@ class TestSocialMediaContracts:
             "mention_id": "mention_001",
             "status": "pending_approval",
             "response_content": reply_request["response_content"],
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "approval_required": True
         }
 
@@ -329,7 +329,7 @@ class TestSocialMediaContracts:
             "retry_after": 900,  # seconds
             "current_usage": 300,
             "max_usage": 300,
-            "reset_time": (datetime.utcnow() + timedelta(minutes=15)).isoformat()
+            "reset_time": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
         }
 
         # Mock rate limit error
@@ -529,9 +529,9 @@ class TestSocialMediaContracts:
         batch_request = {
             "platform": "linkedin",
             "posts": [
-                {"content": "Post 1", "scheduled_time": datetime.utcnow() + timedelta(hours=1)},
-                {"content": "Post 2", "scheduled_time": datetime.utcnow() + timedelta(hours=2)},
-                {"content": "Post 3", "scheduled_time": datetime.utcnow() + timedelta(hours=3)}
+                {"content": "Post 1", "scheduled_time": datetime.now(timezone.utc) + timedelta(hours=1)},
+                {"content": "Post 2", "scheduled_time": datetime.now(timezone.utc) + timedelta(hours=2)},
+                {"content": "Post 3", "scheduled_time": datetime.now(timezone.utc) + timedelta(hours=3)}
             ]
         }
 
@@ -636,7 +636,7 @@ class TestSocialMediaContracts:
             "endpoint": endpoint,
             "limit": 300,
             "remaining": 150,
-            "reset_time": (datetime.utcnow() + timedelta(minutes=15)).isoformat(),
+            "reset_time": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
             "retry_after": None
         }
 
@@ -654,7 +654,7 @@ class TestSocialMediaContracts:
 
         # Verify time format
         reset_time = datetime.fromisoformat(result["reset_time"].replace('Z', '+00:00'))
-        assert reset_time > datetime.utcnow()
+        assert reset_time > datetime.now(timezone.utc)
 
     @pytest.mark.asyncio
     async def test_engagement_metrics_contract(self, mock_social_platform):
@@ -680,7 +680,7 @@ class TestSocialMediaContracts:
             },
             "top_languages": ["en", "es", "fr"],
             "top_locations": ["US", "UK", "CA"],
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
         # Mock metrics retrieval
@@ -707,7 +707,7 @@ class TestSocialPostModelContract:
             "platform": "twitter",
             "content": "Test content",
             "status": "scheduled",
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc),
             "author_id": "user_123"
         }
 
@@ -754,7 +754,7 @@ class TestBrandMentionModelContract:
             "content": "@brand great product!",
             "sentiment": "positive",
             "requires_response": True,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(timezone.utc)
         }
 
         # When creating BrandMention (would fail before implementation)
@@ -809,7 +809,7 @@ class TestSocialMediaServiceContract:
         schedule_data = {
             "content": "Upcoming announcement",
             "platforms": ["twitter", "linkedin"],
-            "schedule_time": datetime.utcnow() + timedelta(days=1),
+            "schedule_time": datetime.now(timezone.utc) + timedelta(days=1),
             "timezone": "America/New_York"
         }
 
@@ -886,8 +886,8 @@ class TestSocialMediaServiceContract:
             "approval_request_id": "approval_001",
             "status": "pending_review",
             "request_details": approval_request,
-            "created_at": datetime.utcnow().isoformat(),
-            "expires_at": (datetime.utcnow() + timedelta(hours=24)).isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
         }
 
         # Mock approval submission

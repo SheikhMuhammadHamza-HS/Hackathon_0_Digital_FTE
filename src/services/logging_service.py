@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 class AuditLogger:
@@ -15,7 +15,7 @@ class AuditLogger:
 
     def _log_path(self) -> Path:
         """Return the path for today's log file."""
-        today = datetime.utcnow().date().isoformat()
+        today = datetime.now(timezone.utc).date().isoformat()
         return self.base_dir / f"{today}.json"
 
     def log(self, event: str, data: dict | None = None) -> bool:
@@ -28,7 +28,7 @@ class AuditLogger:
             ``True`` if the entry was written successfully.
         """
         entry = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "event": event,
             "data": data or {},
         }

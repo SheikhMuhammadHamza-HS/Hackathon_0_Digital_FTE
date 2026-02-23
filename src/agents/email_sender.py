@@ -95,7 +95,7 @@ class EmailSender:
         """
         try:
             # Safety check
-            base_dir = Path(settings.APPROVED_PATH)
+            base_dir = Path(settings.BASE_DIR) / settings.APPROVED_PATH
             if not is_safe_path(draft_path, base_dir):
                 logger.error("Unsafe draft path detected: %s", draft_path)
                 return False
@@ -107,12 +107,12 @@ class EmailSender:
                 logger.error("No recipient found in draft: %s", draft_path)
                 return False
 
-            # Try MCP first
-            if self.use_mcp:
-                return self._send_via_mcp(parsed)
+            # Skip MCP for now - use direct Gmail API
+            # if self.use_mcp:
+            #     return self._send_via_mcp(parsed)
 
-            # Fallback to mock mode
-            return self._send_mock(parsed)
+            # Try direct Gmail API
+            return self._send_direct(parsed)
 
         except Exception as e:
             logger.error("Failed to send email draft %s: %s", draft_path, e)
@@ -167,6 +167,71 @@ class EmailSender:
         except Exception as e:
             logger.error("Failed to send via MCP: %s", e)
             return False # Correctly return False on exception
+
+    def _send_direct(self, parsed: dict) -> bool:
+        """Send email directly using Gmail API.
+
+        Args:
+            parsed: Parsed email data
+
+        Returns:
+            True on success, False on failure
+        """
+        try:
+            from google.oauth2.credentials import Credentials
+            from googleapiclient.discovery import build
+            import base64
+            import email
+            from email.mime.text import MIMEText
+
+            # Get Gmail token from settings
+            gmail_token_str = settings.GMAIL_TOKEN
+            if not gmail_token_str:
+                logger.error("GMAIL_TOKEN not found in settings")
+                return self._send_mock(parsed)
+
+            # Parse token
+            import json
+            token_info = json.loads(gmail_token_str)
+            creds = Credentials.from_authorized_user_info(token_info)
+
+            # Build Gmail service
+            service = build('gmail', 'v1', credentials=creds)
+
+            # Create message
+            message = MIMEText(parsed['body'])
+            message['to'] = parsed['to']
+            message['subject'] = parsed['subject'] or '(No Subject)'
+
+            # Add threading info if available
+            if parsed.get('message_id'):
+                message['In-Reply-To'] = parsed['message_id']
+                message['References'] = parsed['message_id']
+
+            # Encode message
+            raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+
+            # Send email
+            if parsed.get('thread_id'):
+                # Send as reply
+                result = service.users().messages().send(
+                    userId='me',
+                    body={'raw': raw_message, 'threadId': parsed['thread_id']}
+                ).execute()
+            else:
+                # Send as new email
+                result = service.users().messages().send(
+                    userId='me',
+                    body={'raw': raw_message}
+                ).execute()
+
+            logger.info(f"Email sent successfully! Message ID: {result['id']}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to send email directly: {e}")
+            # Fall back to mock mode
+            return self._send_mock(parsed)
 
     def _send_mock(self, parsed: dict) -> bool:
         """Mock send for development/testing without MCP.

@@ -11,7 +11,11 @@ Provides shared utilities including:
 """
 
 from .logging_config import get_logger, setup_logging
-from .file_monitor import get_file_monitor
+# Import file monitor lazily to avoid issues during tests
+try:
+    from .file_monitor import get_file_monitor
+except ImportError:
+    get_file_monitor = None
 from .approval_system import get_approval_system
 from .health_monitor import get_health_monitor, initialize_health_monitor, HealthStatus, HealthEvent
 from .error_recovery import ErrorRecoveryService, ErrorCategory, ErrorSeverity

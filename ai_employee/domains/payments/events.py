@@ -6,7 +6,7 @@ and their handling logic.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from ...core.event_bus import Event, EventHandler, event_handler, handles
@@ -58,7 +58,7 @@ class PaymentEventHandler(EventHandler):
             "invoice_id": event.invoice_id,
             "amount": event.amount,
             "payment_method": event.payment_method,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
         # Check if this completes an invoice
@@ -81,7 +81,7 @@ class PaymentEventHandler(EventHandler):
             "payment_id": event.payment_id,
             "invoice_id": event.invoice_id,
             "reconciled_by": event.reconciled_by,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
         # Generate reconciliation report
@@ -162,7 +162,7 @@ class PaymentEventHandler(EventHandler):
                 "client_id": invoice.client_id,
                 "total_payments": 1,
                 "total_amount": event.amount,
-                "last_payment_date": datetime.utcnow().isoformat()
+                "last_payment_date": datetime.now(timezone.utc).isoformat()
             }
 
             # This would typically update a client metrics service
@@ -189,7 +189,7 @@ class PaymentEventHandler(EventHandler):
                 "invoice_id": payment.invoice_id,
                 "amount": float(payment.amount.amount),
                 "reconciled_by": event.reconciled_by,
-                "reconciled_at": datetime.utcnow().isoformat(),
+                "reconciled_at": datetime.now(timezone.utc).isoformat(),
                 "payment_method": payment.payment_method.value,
                 "bank_reference": payment.bank_reference
             }
@@ -212,7 +212,7 @@ class PaymentEventHandler(EventHandler):
             projections = {
                 "payment_id": event.payment_id,
                 "amount": event.amount,
-                "date": datetime.utcnow().isoformat(),
+                "date": datetime.now(timezone.utc).isoformat(),
                 "type": "inflow"
             }
 

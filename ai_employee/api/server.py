@@ -3,16 +3,46 @@
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from pathlib import Path
+import logging
 
-from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Depends
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Depends, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 import uvicorn
+import secrets
 
 from ..domains.reporting.services import ReportService
 from ..domains.reporting.models import CEOBriefing, FinancialSummary, OperationalMetrics, SocialMediaSummary
 from ..utils.briefing_scheduler import get_scheduler
+from ..utils.error_handlers import (
+    AIEmployeeError,
+    ConfigurationError,
+    ValidationError,
+    IntegrationError,
+    ErrorHandler,
+    get_error_message
+)
+from ..utils.user_guidance import user_guide, get_help_for_error
+from ..utils.performance import performance_monitor, cache_manager
+from ..utils.security import security_middleware, ThreatLevel
+from .auth import (
+    SecurityMiddlewareHTTP,
+    get_current_user,
+    get_optional_user,
+    require_level,
+    SecurityLevel,
+    auth_manager,
+    audit_logger
+)
+from .data_retention import router as retention_router
+from .gdpr import router as gdpr_router
+from .monitoring import router as monitoring_router
+from .backup import router as backup_router
+from ..utils.retention_scheduler import retention_task_manager
+from ..utils.monitoring import monitoring_dashboard
+
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -21,12 +51,21 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Add CORS middleware
+# Include routers
+app.include_router(retention_router)
+app.include_router(gdpr_router)
+app.include_router(monitoring_router)
+app.include_router(backup_router)
+
+# Add security middleware
+app.add_middleware(SecurityMiddlewareHTTP)
+
+# Add CORS middleware (restrict in production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000", "http://localhost:8080"],  # Restrict to known origins
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -34,11 +73,61 @@ app.add_middleware(
 report_service = ReportService()
 scheduler = get_scheduler()
 
+# Exception handlers
+@app.exception_handler(AIEmployeeError)
+async def ai_employee_exception_handler(request: Request, exc: AIEmployeeError):
+    """Handle AI Employee specific exceptions."""
+    ErrorHandler.log_error(exc, context={"request": str(request.url)})
+    return JSONResponse(
+        status_code=400 if exc.severity.value in ["low", "medium"] else 500,
+        content=exc.to_dict()
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Handle unexpected exceptions."""
+    error = AIEmployeeError(
+        message=f"Unexpected error: {str(exc)}",
+        user_message="An unexpected error occurred. Please try again or contact support.",
+        suggestions=[
+            "Check the request parameters",
+            "Try the operation again",
+            "Contact support if the issue persists"
+        ]
+    )
+    ErrorHandler.log_error(error, context={"request": str(request.url), "exception": str(exc)})
+    return JSONResponse(
+        status_code=500,
+        content=error.to_dict()
+    )
+
+
 # Pydantic models for API
 class BriefingRequest(BaseModel):
     week_start: Optional[datetime] = Field(None, description="Start date of the briefing week")
     include_recommendations: bool = Field(True, description="Include proactive recommendations")
     format: str = Field("json", description="Response format: json or markdown")
+
+    @validator('format')
+    def validate_format(cls, v):
+        if v not in ['json', 'markdown']:
+            raise ValidationError(
+                message="Format must be 'json' or 'markdown'",
+                field='format',
+                value=v
+            )
+        return v
+
+    @validator('week_start')
+    def validate_week_start(cls, v):
+        if v and v > datetime.now():
+            raise ValidationError(
+                message="Week start date cannot be in the future",
+                field='week_start',
+                value=v
+            )
+        return v
 
 
 class BriefingResponse(BaseModel):
@@ -62,6 +151,90 @@ class BottleneckAnalysisResponse(BaseModel):
     suggested_actions: List[str]
 
 
+# Authentication Endpoints
+
+@app.post("/api/v1/auth/login")
+async def login(username: str, password: str):
+    """Authenticate user and return token."""
+    try:
+        user = auth_manager.authenticate(username, password)
+        if not user:
+            security_middleware.log_security_event(
+                "failed_login",
+                ThreatLevel.MEDIUM,
+                "unknown",
+                details={"username": username}
+            )
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid credentials"
+            )
+
+        # Generate token
+        token = security_middleware.token_manager.generate_token(
+            user.user_id,
+            user.level,
+            expires_in=3600
+        )
+
+        # Log successful login
+        audit_logger.log(
+            event_type="login",
+            user_id=user.user_id,
+            details={"username": username},
+            ip_address="unknown"  # Would extract from request
+        )
+
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "expires_in": 3600,
+            "user": {
+                "id": user.user_id,
+                "username": user.username,
+                "level": user.level.value
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Authentication failed")
+
+
+@app.post("/api/v1/auth/logout")
+async def logout(user: User = Depends(get_current_user)):
+    """Logout user and revoke token."""
+    try:
+        # Get token from authorization header
+        # In a real implementation, you'd extract and revoke the specific token
+        audit_logger.log(
+            event_type="logout",
+            user_id=user.user_id,
+            details={},
+            ip_address="unknown"
+        )
+
+        return {"message": "Successfully logged out"}
+
+    except Exception as e:
+        logger.error(f"Logout error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Logout failed")
+
+
+@app.get("/api/v1/auth/me")
+async def get_current_user_info(user: User = Depends(get_current_user)):
+    """Get current user information."""
+    return {
+        "id": user.user_id,
+        "username": user.username,
+        "level": user.level.value,
+        "permissions": user.permissions,
+        "last_activity": user.last_activity.isoformat()
+    }
+
+
 # API Endpoints
 
 @app.get("/")
@@ -74,28 +247,70 @@ async def root():
             "briefing": "/api/v1/briefing",
             "subscription_audit": "/api/v1/audit/subscriptions",
             "bottlenecks": "/api/v1/analysis/bottlenecks",
-            "health": "/api/v1/health"
+            "health": "/api/v1/health",
+            "auth": "/api/v1/auth"
         }
     }
 
 
 @app.get("/api/v1/health")
 async def health_check():
-    """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now(),
-        "services": {
-            "reporting": "active",
-            "scheduler": scheduler.get_schedule_status()["is_running"]
+    """Health check endpoint with detailed service status."""
+    try:
+        health_status = {
+            "status": "healthy",
+            "timestamp": datetime.now(),
+            "version": "1.0.0",
+            "uptime": "N/A",  # Could be calculated from app startup time
+            "services": {
+                "reporting": "active",
+                "scheduler": scheduler.get_schedule_status()["is_running"],
+                "api": "active",
+                "database": "unknown",  # Could add actual DB health check
+                "file_system": "unknown"  # Could add Vault directory check
+            },
+            "environment": {
+                "python_version": f"{datetime.now().year}",  # Placeholder
+                "debug": False
+            }
         }
-    }
+
+        # Check Vault directory structure
+        try:
+            from pathlib import Path
+            vault_path = Path.home() / "Vault"
+            if vault_path.exists():
+                required_dirs = ["Inbox", "Needs_Action", "Done", "Logs", "Pending_Approval"]
+                missing_dirs = [d for d in required_dirs if not (vault_path / d).exists()]
+                if missing_dirs:
+                    health_status["services"]["file_system"] = f"missing_dirs: {missing_dirs}"
+                else:
+                    health_status["services"]["file_system"] = "healthy"
+            else:
+                health_status["services"]["file_system"] = "vault_directory_missing"
+        except Exception as e:
+            health_status["services"]["file_system"] = f"error: {str(e)}"
+
+        return health_status
+
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        raise IntegrationError(
+            message=f"Health check failed: {str(e)}",
+            service="System Health Monitor",
+            suggestions=[
+                "Check system resources",
+                "Verify all services are running",
+                "Check application logs"
+            ]
+        )
 
 
 @app.post("/api/v1/briefing", response_model=BriefingResponse)
 async def generate_ceo_briefing(
     request: BriefingRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    user: User = Depends(require_level(SecurityLevel.USER))
 ):
     """Generate CEO briefing for specified week."""
     try:
@@ -192,24 +407,56 @@ async def generate_ceo_briefing(
                 status="success"
             )
 
+    except ValidationError as e:
+        logger.warning(f"Validation error in briefing request: {str(e)}")
+        raise e
+    except IntegrationError as e:
+        logger.error(f"Integration error generating briefing: {str(e)}")
+        raise e
     except Exception as e:
-        logger.error(f"Error generating briefing: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error generating briefing: {str(e)}", exc_info=True)
+        raise AIEmployeeError(
+            message=f"Failed to generate CEO briefing: {str(e)}",
+            user_message="Unable to generate CEO briefing due to a system error. Please try again.",
+            suggestions=[
+                "Check if all required services are available",
+                "Verify the date range is valid",
+                "Try generating a briefing for a different week",
+                "Contact support if the issue persists"
+            ],
+            details={"original_error": str(e), "request_data": request.dict()}
+        )
 
 
 @app.get("/api/v1/briefing/latest")
-async def get_latest_briefing():
+async def get_latest_briefing(user: User = Depends(require_level(SecurityLevel.USER))):
     """Get the most recent generated briefing."""
     try:
         # Check briefing directory
         briefing_dir = Path("briefings/weekly")
         if not briefing_dir.exists():
-            raise HTTPException(status_code=404, detail="No briefings found")
+            raise AIEmployeeError(
+                message="No briefings directory found",
+                user_message="No CEO briefings have been generated yet.",
+                suggestions=[
+                    "Generate your first CEO briefing using the /api/v1/briefing endpoint",
+                    "Check if the briefing scheduler is running",
+                    "Verify the briefings directory permissions"
+                ]
+            )
 
         # Find latest briefing
         briefings = list(briefing_dir.glob("*.md"))
         if not briefings:
-            raise HTTPException(status_code=404, detail="No briefings found")
+            raise AIEmployeeError(
+                message="No briefing files found",
+                user_message="No CEO briefings have been generated yet.",
+                suggestions=[
+                    "Generate your first CEO briefing using the /api/v1/briefing endpoint",
+                    "Check the briefing generation logs",
+                    "Verify the briefing scheduler is configured correctly"
+                ]
+            )
 
         latest = max(briefings, key=lambda p: p.stat().st_mtime)
 
@@ -219,11 +466,19 @@ async def get_latest_briefing():
             filename=latest.name
         )
 
-    except HTTPException:
+    except AIEmployeeError:
         raise
     except Exception as e:
         logger.error(f"Error getting latest briefing: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise AIEmployeeError(
+            message=f"Failed to retrieve latest briefing: {str(e)}",
+            user_message="Unable to retrieve the latest CEO briefing.",
+            suggestions=[
+                "Check if briefing files exist in the briefings directory",
+                "Verify file permissions",
+                "Try generating a new briefing"
+            ]
+        )
 
 
 @app.get("/api/v1/audit/subscriptions", response_model=SubscriptionAuditResponse)
@@ -260,9 +515,20 @@ async def get_subscription_audit():
             recommendations=recommendations
         )
 
+    except IntegrationError as e:
+        logger.error(f"Integration error in subscription audit: {str(e)}")
+        raise e
     except Exception as e:
         logger.error(f"Error in subscription audit: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise AIEmployeeError(
+            message=f"Failed to audit subscriptions: {str(e)}",
+            user_message="Unable to perform subscription audit at this time.",
+            suggestions=[
+                "Check if financial data sources are available",
+                "Verify bank transaction access",
+                "Try again later or contact support"
+            ]
+        )
 
 
 @app.get("/api/v1/analysis/bottlenecks", response_model=BottleneckAnalysisResponse)
@@ -384,7 +650,424 @@ async def stop_scheduler():
 
     except Exception as e:
         logger.error(f"Error stopping scheduler: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise AIEmployeeError(
+            message=f"Failed to stop scheduler: {str(e)}",
+            user_message="Unable to stop the briefing scheduler.",
+            suggestions=[
+                "Check if scheduler is running",
+                "Verify system permissions",
+                "Try restarting the API server"
+            ]
+        )
+
+
+@app.get("/api/v1/help")
+async def get_help(
+    category: Optional[str] = Query(None, description="Help category: getting_started, troubleshooting, best_practices, faq"),
+    search: Optional[str] = Query(None, description="Search term for help content"),
+    endpoint: Optional[str] = Query(None, description="API endpoint for contextual help")
+):
+    """Get help and guidance for using the AI Employee system."""
+    try:
+        if endpoint:
+            # Get contextual help for API endpoint
+            method = "GET"  # Default to GET
+            if " " in endpoint:
+                method, endpoint = endpoint.split(" ", 1)
+            return user_guide.get_contextual_help(endpoint, method)
+
+        elif search:
+            # Search help content
+            results = user_guide.search_guidance(search)
+            return {
+                "query": search,
+                "results": results,
+                "count": len(results)
+            }
+
+        elif category:
+            # Get specific category guidance
+            from ..utils.user_guidance import GuidanceCategory
+            try:
+                cat_enum = GuidanceCategory(category)
+                return user_guide.get_guidance(cat_enum)
+            except ValueError:
+                raise ValidationError(
+                    message=f"Invalid help category: {category}",
+                    field="category",
+                    value=category
+                )
+
+        else:
+            # Return overview of available help
+            return {
+                "message": "AI Employee Help System",
+                "categories": [
+                    "getting_started",
+                    "troubleshooting",
+                    "best_practices",
+                    "faq"
+                ],
+                "usage": {
+                    "get_category": "/api/v1/help?category=getting_started",
+                    "search": "/api/v1/help?search=odoo connection",
+                    "contextual": "/api/v1/help?endpoint=/api/v1/briefing"
+                },
+                "quick_links": {
+                    "setup_checklist": "/api/v1/help/setup-checklist",
+                    "error_help": "/api/v1/help/error?error=error_message"
+                }
+            }
+
+    except AIEmployeeError:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving help: {str(e)}")
+        raise AIEmployeeError(
+            message=f"Failed to retrieve help: {str(e)}",
+            user_message="Help system temporarily unavailable.",
+            suggestions=[
+                "Try again later",
+                "Check the API documentation at /docs",
+                "Contact support if the issue persists"
+            ]
+        )
+
+
+@app.get("/api/v1/help/setup-checklist")
+async def get_setup_checklist():
+    """Get personalized setup checklist."""
+    try:
+        return user_guide.generate_setup_checklist()
+    except Exception as e:
+        logger.error(f"Error generating setup checklist: {str(e)}")
+        raise AIEmployeeError(
+            message=f"Failed to generate setup checklist: {str(e)}",
+            user_message="Unable to generate setup checklist."
+        )
+
+
+@app.get("/api/v1/help/error")
+async def get_error_help(error: str = Query(..., description="Error message to get help for")):
+    """Get help suggestions for a specific error."""
+    try:
+        return get_help_for_error(error)
+    except Exception as e:
+        logger.error(f"Error getting error help: {str(e)}")
+        return {
+            "category": "general",
+            "suggestions": [
+                "Check system logs for detailed error information",
+                "Try the operation again",
+                "Contact support with error details"
+            ]
+        }
+
+
+@app.get("/api/v1/performance/metrics")
+async def get_performance_metrics(
+    operation: Optional[str] = Query(None, description="Filter by operation name"),
+    limit: int = Query(100, description="Maximum number of metrics to return")
+):
+    """Get performance metrics."""
+    try:
+        metrics = performance_monitor.get_metrics(operation)
+        return {
+            "metrics": metrics[-limit:],  # Return most recent
+            "total_count": len(metrics),
+            "operation_filter": operation
+        }
+    except Exception as e:
+        logger.error(f"Error getting performance metrics: {str(e)}")
+        raise AIEmployeeError(
+            message=f"Failed to get performance metrics: {str(e)}",
+            user_message="Performance metrics unavailable."
+        )
+
+
+@app.get("/api/v1/performance/statistics")
+async def get_performance_statistics(
+    operation: Optional[str] = Query(None, description="Get statistics for specific operation")
+):
+    """Get performance statistics."""
+    try:
+        if operation:
+            return performance_monitor.get_statistics(operation)
+
+        # Return statistics for all operations
+        all_stats = {}
+        for op_name in performance_monitor.metrics.keys():
+            all_stats[op_name] = performance_monitor.get_statistics(op_name)
+
+        return {
+            "operations": all_stats,
+            "summary": {
+                "total_operations": sum(
+                    stats.get("total_operations", 0) for stats in all_stats.values()
+                ),
+                "average_success_rate": mean(
+                    stats.get("success_rate", 0) for stats in all_stats.values()
+                    if stats.get("success_rate") is not None
+                ) if all_stats else 0
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting performance statistics: {str(e)}")
+        raise AIEmployeeError(
+            message=f"Failed to get performance statistics: {str(e)}",
+            user_message="Performance statistics unavailable."
+        )
+
+
+@app.get("/api/v1/performance/slow")
+async def get_slow_operations(
+    threshold_ms: float = Query(1000, description="Threshold in milliseconds"),
+    limit: int = Query(20, description="Maximum number to return")
+):
+    """Get slow operations."""
+    try:
+        slow_ops = performance_monitor.get_slow_operations(threshold_ms)
+        return {
+            "threshold_ms": threshold_ms,
+            "slow_operations": slow_ops[:limit],
+            "count": len(slow_ops)
+        }
+    except Exception as e:
+        logger.error(f"Error getting slow operations: {str(e)}")
+        raise AIEmployeeError(
+            message=f"Failed to get slow operations: {str(e)}",
+            user_message="Slow operations data unavailable."
+        )
+
+
+@app.get("/api/v1/performance/cache")
+async def get_cache_statistics():
+    """Get cache performance statistics."""
+    try:
+        stats = await cache_manager.get_stats()
+        return stats
+    except Exception as e:
+        logger.error(f"Error getting cache statistics: {str(e)}")
+        raise AIEmployeeError(
+            message=f"Failed to get cache statistics: {str(e)}",
+            user_message="Cache statistics unavailable."
+        )
+
+
+@app.post("/api/v1/performance/cache/clear")
+async def clear_expired_cache(user: User = Depends(require_level(SecurityLevel.ADMIN))):
+    """Clear expired cache entries."""
+    try:
+        await cache_manager.clear_expired()
+        audit_logger.log(
+            event_type="cache_cleared",
+            user_id=user.user_id,
+            details={},
+            ip_address="unknown"
+        )
+        return {"message": "Expired cache entries cleared"}
+    except Exception as e:
+        logger.error(f"Error clearing cache: {str(e)}")
+        raise AIEmployeeError(
+            message=f"Failed to clear cache: {str(e)}",
+            user_message="Cache cleanup failed."
+        )
+
+
+# Security Management Endpoints (Admin only)
+
+@app.get("/api/v1/admin/security/summary")
+async def get_security_summary(user: User = Depends(require_level(SecurityLevel.ADMIN))):
+    """Get security summary."""
+    try:
+        summary = security_middleware.get_security_summary()
+        return summary
+    except Exception as e:
+        logger.error(f"Error getting security summary: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get security summary")
+
+
+@app.get("/api/v1/admin/audit/log")
+async def get_audit_log(
+    limit: int = 100,
+    user_id: Optional[str] = None,
+    user: User = Depends(require_level(SecurityLevel.ADMIN))
+):
+    """Get audit log."""
+    try:
+        if user_id:
+            events = audit_logger.get_user_activity(user_id, limit)
+        else:
+            events = audit_logger.audit_log[-limit:]
+
+        return {
+            "events": events,
+            "total": len(events)
+        }
+    except Exception as e:
+        logger.error(f"Error getting audit log: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get audit log")
+
+
+@app.post("/api/v1/admin/users")
+async def create_user(
+    username: str,
+    password: str,
+    level: str,
+    permissions: Optional[List[str]] = None,
+    admin_user: User = Depends(require_level(SecurityLevel.ADMIN))
+):
+    """Create a new user."""
+    try:
+        # Validate security level
+        try:
+            user_level = SecurityLevel(level)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid security level")
+
+        # Only admin can create admin users
+        if user_level == SecurityLevel.ADMIN and admin_user.level != SecurityLevel.ADMIN:
+            raise HTTPException(status_code=403, detail="Cannot create admin users")
+
+        # Create user
+        user = auth_manager.create_user(username, password, user_level, permissions)
+
+        audit_logger.log(
+            event_type="user_created",
+            user_id=admin_user.user_id,
+            details={
+                "new_user_id": user.user_id,
+                "username": username,
+                "level": level
+            },
+            ip_address="unknown"
+        )
+
+        return {
+            "message": "User created successfully",
+            "user": {
+                "id": user.user_id,
+                "username": user.username,
+                "level": user.level.value
+            }
+        }
+
+    except AuthenticationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creating user: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create user")
+
+
+@app.post("/api/v1/admin/api-keys")
+async def generate_api_key(
+    user_id: str,
+    admin_user: User = Depends(require_level(SecurityLevel.ADMIN))
+):
+    """Generate API key for user."""
+    try:
+        user = auth_manager.users.get(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        api_key = auth_manager.generate_api_key(user)
+
+        audit_logger.log(
+            event_type="api_key_generated",
+            user_id=admin_user.user_id,
+            details={
+                "target_user_id": user_id
+            },
+            ip_address="unknown"
+        )
+
+        return {
+            "api_key": api_key,
+            "user_id": user_id,
+            "username": user.username
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating API key: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate API key")
+
+
+@app.post("/api/v1/admin/security/block-ip")
+async def block_ip(
+    ip_address: str,
+    duration_hours: int = 24,
+    user: User = Depends(require_level(SecurityLevel.ADMIN))
+):
+    """Block an IP address."""
+    try:
+        from datetime import timedelta
+        security_middleware.blocked_ips[ip_address] = datetime.now() + timedelta(hours=duration_hours)
+
+        security_middleware.log_security_event(
+            "ip_blocked_by_admin",
+            ThreatLevel.MEDIUM,
+            ip_address,
+            user_id=user.user_id,
+            details={"duration_hours": duration_hours}
+        )
+
+        return {"message": f"IP {ip_address} blocked for {duration_hours} hours"}
+
+    except Exception as e:
+        logger.error(f"Error blocking IP: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to block IP")
+
+
+# Data Retention Scheduler Endpoints
+
+@app.get("/api/v1/retention/scheduler/status")
+async def get_retention_scheduler_status(user: User = Depends(require_level(SecurityLevel.ADMIN))):
+    """Get retention scheduler status."""
+    return retention_task_manager.get_scheduler_status()
+
+
+@app.post("/api/v1/retention/scheduler/start")
+async def start_retention_scheduler(user: User = Depends(require_level(SecurityLevel.ADMIN))):
+    """Start the retention scheduler."""
+    try:
+        if retention_task_manager.running:
+            return {"message": "Scheduler is already running"}
+
+        await retention_task_manager.start_scheduler()
+        return {"message": "Retention scheduler started successfully"}
+
+    except Exception as e:
+        logger.error(f"Failed to start scheduler: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to start scheduler")
+
+
+@app.post("/api/v1/retention/scheduler/stop")
+async def stop_retention_scheduler(user: User = Depends(require_level(SecurityLevel.ADMIN))):
+    """Stop the retention scheduler."""
+    try:
+        if not retention_task_manager.running:
+            return {"message": "Scheduler is not running"}
+
+        await retention_task_manager.stop_scheduler()
+        return {"message": "Retention scheduler stopped successfully"}
+
+    except Exception as e:
+        logger.error(f"Failed to stop scheduler: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to stop scheduler")
+
+
+@app.post("/api/v1/retention/scheduler/run-now")
+async def run_retention_now(
+    dry_run: bool = Query(False, description="Perform dry run"),
+    user: User = Depends(require_level(SecurityLevel.ADMIN))
+):
+    """Run retention policies immediately."""
+    try:
+        result = await retention_task_manager.run_immediate_retention(dry_run=dry_run)
+        return result
+    except Exception as e:
+        logger.error(f"Failed to run retention: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to run retention")
 
 
 # Error handlers

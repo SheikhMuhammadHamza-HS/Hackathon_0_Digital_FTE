@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Employee - Monitoring Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        .metric-card {
+            @apply bg-white rounded-lg shadow p-6;
+        }
+        .status-healthy { @apply text-green-600; }
+        .status-degraded { @apply text-yellow-600; }
+        .status-unhealthy { @apply text-red-600; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-gray-900">AI Employee Monitoring</h1>
+                    <span class="ml-4 px-3 py-1 text-sm rounded-full" id="status-badge">
+                        <span id="status-text">Loading...</span>
+                    </span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="refreshDashboard()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        Refresh
+                    </button>
+                    <select id="time-range" class="px-4 py-2 border rounded-md">
+                        <option value="1">Last 1 hour</option>
+                        <option value="24">Last 24 hours</option>
+                        <option value="168">Last 7 days</option>
+                        <option value="720">Last 30 days</option>
+                    </select>
+                    <button onclick="exportData()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                        Export
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Overview Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="metric-card">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold">System Health</h3>
+                    <span id="health-status" class="px-3 py-1 rounded-full text-sm font-medium">-</span>
+                </div>
+                <div class="text-3xl font-bold" id="health-value">-</div>
+                <div class="text-sm text-gray-600" id="health-message">-</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold">CPU Usage</h3>
+                    <span class="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                        <span id="cpu-status">Normal</span>
+                    </span>
+                </div>
+                <div class="text-3xl font-bold" id="cpu-value">0%</div>
+                <div class="text-sm text-gray-600" id="cpu-message">Monitoring...</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-3xl font-semibold">Memory Usage</h3>
+                    <span class="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                        <span id="memory-status">Normal</span>
+                    </span>
+                </div>
+                <div class="text-3xl font-bold" id="memory-value">0%</div>
+                <div class="text-sm text-gray-600" id="memory-message">Monitoring...</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-3xl font-semibold">Active Alerts</h3>
+                    <span class="px-3 py-1 rounded-full text-sm font-medium" id="alert-status">-</span>
+                </div>
+                <div class="text-3xl font-bold" id="alerts-count">0</div>
+                <div class="text-sm text-gray-600" id="alerts-message">No active alerts</div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- System Metrics Chart -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4">System Metrics</h2>
+                <canvas id="system-chart" width="400" height="200"></canvas>
+            </div>
+
+            <!-- Response Time Chart -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4">Response Times</h2>
+                <canvas id="response-chart" width="400" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- Health Checks -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-xl font-bold mb-4">Health Checks</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Component</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Response Time</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Message</th>
+                        </tr>
+                    </thead>
+                    <tbody id="health-checks-table">
+                        <!-- Populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Active Alerts -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-xl font-bold mb-4">Active Alerts</h2>
+            <div id="alerts-container">
+                <!-- Populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Recent Metrics -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-bold mb-4">Recent Metrics</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
+                            <th class="value-col px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody id="metrics-table">
+                        <!-- Populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let dashboardData = {};
+        let charts = {};
+
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboard();
+            setInterval(refreshDashboard, 30000); // Refresh every 30 seconds
+        });
+
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/v1/monitoring/dashboard');
+                dashboardData = await response.json();
+                updateDashboard();
+                updateCharts();
+            } catch (error) {
+                console.error('Failed to load dashboard:', error);
+            }
+        }
+
+        function updateDashboard() {
+            // Update status badge
+            const statusBadge = document.getElementById('status-badge');
+            const statusText = document.getElementById('status-text');
+            const overallHealth = dashboardData.health_status;
+
+            statusBadge.className = `px-3 py-1 rounded-full text-sm font-medium`;
+            statusText.textContent = overallHealth.charAt(0).toUpperCase() + overallHealth.slice(1);
+
+            if (overallHealth === 'healthy') {
+                statusBadge.classList.add('bg-green-100', 'text-green-800');
+                statusBadge.classList.remove('bg-yellow-100', 'text-yellow-800');
+                statusBadge.classList.remove('bg-red-100', 'text-red-800');
+            } else if (overallHealth === 'degraded') {
+                statusBadge.classList.add('bg-yellow-100', 'text-yellow-800');
+                statusBadge.classList.remove('bg-green-100', 'text-green-800');
+                statusBadge.classList.remove('bg-100', 'text-red-800');
+            } else {
+                statusBadge.classList.add('bg-red-100', 'text-red-800');
+                statusBadge.classList.remove('bg-green-100', 'text-green-800');
+                statusBadge.classList.remove('bg-yellow-100', 'text-yellow-800');
+            }
+
+            // Update system metrics
+            updateMetric('health', dashboardData.health_status, 'Overall Health');
+            updateMetric('cpu', dashboardData.system_metrics?.cpu?.percent, 'CPU Usage');
+            updateMetric('memory', dashboardData.system_metrics?.memory?.percent, 'Memory Usage');
+            updateMetric('alerts', dashboardData.active_alerts, 'Active Alerts');
+
+            // Update tables
+            updateHealthChecks();
+            updateMetricsTable();
+            updateAlerts();
+        }
+
+        function updateMetric(id, value, label, message = null) {
+            const valueElement = document.getElementById(`${id}-value`);
+            const statusElement = document.getElementById(`${id}-status`);
+            const messageElement = document.getElementById(`${id}-message`);
+
+            if (valueElement) {
+                valueElement.textContent = typeof value === 'number' ? value.toFixed(1) : value;
+            }
+
+            if (statusElement && label) {
+                statusElement.textContent = label;
+            }
+
+            if (messageElement && message) {
+                messageElement.textContent = message;
+            }
+        }
+
+        function updateHealthChecks() {
+            const tableBody = document.getElementById('health-checks-table');
+            tableBody.innerHTML = '';
+
+            const healthChecks = dashboardData.health_checks || [];
+
+            healthChecks.forEach(check => {
+                const row = document.createElement('tr');
+
+                // Status indicator
+                const statusCell = document.createElement('td');
+                statusCell.className = 'px-6 py-4 whitespace-nowrap';
+                statusCell.innerHTML = `
+                    <span class="px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(check.status)}">
+                        ${check.status}
+                    </span>
+                `;
+                row.appendChild(statusCell);
+
+                // Name
+                const nameCell = document.createElement('td');
+                nameCell.className = 'px-6 py-4 whitespace-nowrap';
+                nameCell.textContent = check.name;
+                row.appendChild(nameCell);
+
+                // Message
+                const messageCell = document.createElement('td');
+                messageCell.className = 'px-6 py-4';
+                messageCell.textContent = check.message;
+                row.appendChild(messageCell);
+
+                // Response time
+                const responseCell = document.createElement('td');
+                responseCell.className = 'px-6 py-4 whitespace-nowrap';
+                responseCell.textContent = `${check.response_time_ms}ms`;
+                row.appendChild(responseCell);
+
+                tableBody.appendChild(row);
+            });
+        }
+
+        function getStatusClass(status) {
+            switch (status) {
+                case 'healthy': return 'bg-green-100 text-green-800';
+                case 'degraded': return 'bg-yellow-100 text-yellow-800';
+                case 'unhealthy': return 'bg-red-100 text-red-800';
+                default: return 'bg-gray-100 text-gray-800';
+            }
+        }
+
+        function updateMetricsTable() {
+            const tableBody = document.getElementById('metrics-table');
+            tableBody.innerHTML = '';
+
+            const metrics = dashboardData.system_metrics || {};
+
+            // Get recent metrics (last 20)
+            for (const [name, metricList] of Object.entries(metrics)) {
+                if (Array.isArray(metricList)) {
+                    metricList.slice(-10).forEach(metric => {
+                        const row = document.createElement('tr');
+
+                        // Metric name
+                        const nameCell = document.createElement('td');
+                        nameCell.className = 'px-6 py-4 whitespace-nowrap';
+                        nameCell.textContent = metric.name;
+                        row.appendChild(nameCell);
+
+                        // Value
+                        const valueCell = document.createElement('td');
+                        valueCell.className = 'px-6 py-4 whitespace-nowrap';
+                        valueCell.textContent = metric.value.toFixed(2);
+                        row.appendChild(valueCell);
+
+                        // Timestamp
+                        const timeCell = document.createElement('td');
+                        timeCell.className = 'px-6 py-4 whitespace-nowrap';
+                        timeCell.textContent = new Date(metric.timestamp).toLocaleString();
+                        row.appendChild(timeCell);
+
+                        tableBody.appendChild(row);
+                    });
+                }
+            }
+        }
+
+        function updateAlerts() {
+            const container = document.getElementById('alerts-container');
+            container.innerHTML = '';
+
+            const alerts = dashboardData.recent_alerts || [];
+
+            if (alerts.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No active alerts</p>';
+                return;
+            }
+
+            alerts.forEach(alert => {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `p-4 mb-4 rounded-lg border-l-4 ${
+                    alert.severity === 'critical' ? 'border-red-500 bg-red-50' :
+                    alert.severity === 'error' ? 'border-orange-500 bg-orange-50' :
+                    alert.severity === 'warning' ? 'border-yellow-500 bg-yellow-50' :
+                    'border-blue-500 bg-blue-50'
+                }`;
+
+                alertDiv.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-semibold">${alert.title}</h4>
+                        <span class="text-sm">${alert.severity.toUpperCase()}</span>
+                    </div>
+                    <p class="text-sm">${alert.description}</p>
+                    <div class="text-xs text-gray-500">
+                        <span>Metric: ${alert.metric_name}</span><br>
+                        <span>Value: ${alert.current_value}</span><br>
+                        <span>Threshold: ${alert.threshold}</span>
+                    </div>
+                `;
+
+                container.appendChild(alertDiv);
+            });
+        }
+
+        function updateCharts() {
+            // Update system metrics chart
+            updateSystemChart();
+            updateResponseChart();
+        }
+
+        function updateSystemChart() {
+            const ctx = document.getElementById('system-chart').getContext('2d');
+
+            // Destroy existing chart
+            if (charts.system) {
+                charts.system.destroy();
+            }
+
+            // Prepare data
+            const timestamps = [];
+            const cpuData = [];
+            const memoryData = [];
+
+            // Get last 50 data points
+            const cpuHistory = monitoring_dashboard.get_historical_metrics('system.cpu.percent', 2);
+            const memoryHistory = monitoring_dashboard.get_historical_metrics('system.memory.percent', 2);
+
+            cpuHistory.forEach(m => {
+                timestamps.push(new Date(m.timestamp));
+                cpuData.push(m.value);
+            });
+
+            memoryHistory.forEach(m => {
+                if len(timestamps) < len(memoryHistory)) {
+                    timestamps.append(new Date(m.timestamp));
+                    memoryData.push(m.value);
+                }
+            });
+
+            charts.system = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timestamps.map(t => t.toLocaleTimeString()),
+                    datasets: [
+                        {
+                            label: 'CPU Usage (%)',
+                            data: cpuData,
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Memory Usage (%)',
+                            data: memoryData,
+                            borderColor: 'rgb(25, 118, 210)',
+                            backgroundColor: 'rgba(25, 118, 210, 0.1)',
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+            });
+        }
+
+        function updateResponseChart() {
+            const ctx = document.getElementById('response-chart').getContext('2d');
+
+            // Destroy existing chart
+            if (charts.response) {
+                charts.response.destroy();
+            }
+
+            // Get response time data
+            const healthChecks = list(monitoring_dashboard.health_monitor.health_history);
+            const responseTimes = healthChecks.map(h => h.response_time_ms);
+
+            if (responseTimes.length === 0) {
+                return;
+            }
+
+            const timestamps = healthChecks.map(h => h.timestamp);
+
+            charts.response = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timestamps.map(t => new Date(t).toLocaleTimeString()),
+                    datasets: [{
+                        label: 'Response Time (ms)',
+                        data: responseTimes,
+                        borderColor: 'rgb(168, 85, 247)',
+                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                    }
+                }
+            });
+        }
+
+        async function refreshDashboard() {
+            await loadDashboard();
+        }
+
+        async function exportData() {
+            try {
+                const response = await fetch('/api/v1/monitoring/export/monitoring-data', {
+                    params: {
+                        format: 'json',
+                        days: 7
+                    }
+                });
+                const data = await response.json();
+
+                const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `monitoring_export_${datetime.now().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Failed to export data:', error);
+            }
+        }
+
+        // Auto-refresh based on time range
+        document.getElementById('time-range').addEventListener('change', function() {
+            const hours = parseInt(this.value);
+            monitoring_dashboard.get_historical_metrics('system.cpu.percent', hours);
+        });
+    </script>
+</body>
+</html>

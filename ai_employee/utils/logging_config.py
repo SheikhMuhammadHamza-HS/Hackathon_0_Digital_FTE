@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 from typing import Optional, Dict, Any
 import structlog
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ai_employee.core.config import get_config
 
@@ -50,7 +50,7 @@ class JSONFormatter(logging.Formatter):
     def format(self, record):
         """Format log record as JSON."""
         log_entry = {
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'timestamp': datetime.now(timezone.utc).isoformat() + 'Z',
             'level': record.levelname,
             'logger': record.name,
             'message': record.getMessage(),
@@ -341,7 +341,7 @@ class BusinessLogger:
                 'invoice_id': invoice_id,
                 'client_id': client_id,
                 'amount': amount,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
         )
 
@@ -354,7 +354,7 @@ class BusinessLogger:
                 'payment_id': payment_id,
                 'invoice_id': invoice_id,
                 'amount': amount,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
         )
 
@@ -367,7 +367,7 @@ class BusinessLogger:
                 'item_type': item_type,
                 'item_id': item_id,
                 'amount': amount,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
         )
 
@@ -381,7 +381,7 @@ class BusinessLogger:
                 'item_id': item_id,
                 'approved': approved,
                 'user': user,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
         )
 
@@ -403,7 +403,7 @@ class SecurityLogger:
                 'user': user,
                 'success': success,
                 'ip_address': ip_address,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
         )
 
@@ -416,7 +416,7 @@ class SecurityLogger:
                 'resource': resource,
                 'user': user,
                 'reason': reason,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
         )
 
@@ -428,7 +428,7 @@ class SecurityLogger:
                 'event': 'security_violation',
                 'violation_type': violation_type,
                 'details': details,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
         )
 

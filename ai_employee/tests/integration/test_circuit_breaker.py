@@ -9,7 +9,7 @@ import pytest
 import asyncio
 import time
 from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from ai_employee.core.circuit_breaker import (
     CircuitBreaker, CircuitBreakerConfig, CircuitState,
@@ -90,7 +90,7 @@ class TestCircuitBreakerIntegration:
         # Open the circuit
         circuit_breaker._state = CircuitState.OPEN
         circuit_breaker._failure_count = 3
-        circuit_breaker._last_failure_time = datetime.utcnow() - timedelta(seconds=3)
+        circuit_breaker._last_failure_time = datetime.now(timezone.utc) - timedelta(seconds=3)
 
         # Wait for recovery timeout
         await asyncio.sleep(2.5)

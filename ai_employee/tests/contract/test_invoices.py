@@ -7,7 +7,7 @@ and should pass before any implementation exists.
 
 import pytest
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
 import json
 
@@ -55,8 +55,8 @@ class TestInvoiceContracts:
                     "tax_amount": 600.00,
                     "total_amount": 6600.00,
                     "line_items": data["line_items"],
-                    "created_at": datetime.utcnow().isoformat(),
-                    "updated_at": datetime.utcnow().isoformat()
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
                 }
                 return invoice
 
@@ -73,7 +73,7 @@ class TestInvoiceContracts:
                     "subtotal": 6000.00,
                     "tax_amount": 600.00,
                     "total_amount": 6600.00,
-                    "created_at": datetime.utcnow().isoformat()
+                    "created_at": datetime.now(timezone.utc).isoformat()
                 }
 
             async def list_invoices(self, status: str = None, limit: int = 50, offset: int = 0) -> Dict[str, Any]:
@@ -85,7 +85,7 @@ class TestInvoiceContracts:
                             "invoice_number": "INV-2025-001",
                             "status": "draft",
                             "total_amount": 6600.00,
-                            "created_at": datetime.utcnow().isoformat()
+                            "created_at": datetime.now(timezone.utc).isoformat()
                         }
                     ],
                     "total": 1,
@@ -101,7 +101,7 @@ class TestInvoiceContracts:
                 return {
                     "id": invoice_id,
                     "status": "posted",
-                    "posted_at": datetime.utcnow().isoformat()
+                    "posted_at": datetime.now(timezone.utc).isoformat()
                 }
 
         return MockInvoiceClient()

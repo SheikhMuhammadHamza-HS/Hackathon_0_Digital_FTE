@@ -25,7 +25,7 @@ except ImportError:
 import time
 import threading
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any
 
@@ -349,7 +349,7 @@ class Scheduler:
     def _run_linkedin_job(self):
         """Create a LinkedIn post draft."""
         success = False
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(timezone.utc)
         trigger_id = 'scheduler_' + timestamp.strftime('%Y%m%d%H%M%S')
         dummy_trigger = TriggerFile(
             id=trigger_id,

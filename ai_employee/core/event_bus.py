@@ -6,7 +6,7 @@ Provides publish-subscribe pattern for loose coupling between components.
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Callable, Type, TypeVar, Optional, Union
 from dataclasses import dataclass, field
 from enum import Enum
@@ -28,7 +28,7 @@ class EventPriority(Enum):
 @dataclass
 class Event:
     """Base event class."""
-    event_id: str = field(default_factory=lambda: f"{datetime.utcnow().isoformat()}-{id(object())}")
+    event_id: str = field(default_factory=lambda: f"{datetime.now(timezone.utc).isoformat()}-{id(object())}")
     timestamp: datetime = field(default_factory=datetime.utcnow)
     source: str = field(default_factory="")
     priority: EventPriority = field(default_factory=EventPriority.NORMAL)

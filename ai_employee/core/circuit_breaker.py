@@ -11,7 +11,7 @@ import time
 from enum import Enum
 from typing import Callable, Any, Optional, Dict, List
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 import functools
 import weakref
 
@@ -121,7 +121,7 @@ class CircuitBreaker:
         if self._state == CircuitState.OPEN:
             # Check if recovery timeout has passed
             if self._last_failure_time:
-                elapsed = (datetime.utcnow() - self._last_failure_time).total_seconds()
+                elapsed = (datetime.now(timezone.utc) - self._last_failure_time).total_seconds()
                 if elapsed >= self.config.recovery_timeout:
                     return True
             return False
@@ -150,7 +150,7 @@ class CircuitBreaker:
 
             # Transition to HALF_OPEN if we were OPEN and timeout passed
             if self._state == CircuitState.OPEN and self._last_failure_time:
-                elapsed = (datetime.utcnow() - self._last_failure_time).total_seconds()
+                elapsed = (datetime.now(timezone.utc) - self._last_failure_time).total_seconds()
                 if elapsed >= self.config.recovery_timeout:
                     self._state = CircuitState.HALF_OPEN
                     self._success_count = 0
@@ -231,7 +231,7 @@ class CircuitBreaker:
     def _handle_success(self) -> None:
         """Handle successful call."""
         self._stats.successful_calls += 1
-        self._stats.last_success_time = datetime.utcnow()
+        self._stats.last_success_time = datetime.now(timezone.utc)
         self._stats.consecutive_failures = 0
         self._stats.consecutive_successes += 1
 
@@ -246,7 +246,7 @@ class CircuitBreaker:
     def _handle_failure(self, exception: Exception) -> None:
         """Handle failed call."""
         self._stats.failed_calls += 1
-        self._stats.last_failure_time = datetime.utcnow()
+        self._stats.last_failure_time = datetime.now(timezone.utc)
         self._stats.consecutive_failures += 1
         self._stats.consecutive_successes = 0
 
@@ -268,7 +268,7 @@ class CircuitBreaker:
     def force_open(self) -> None:
         """Force the circuit to open."""
         self._state = CircuitState.OPEN
-        self._last_failure_time = datetime.utcnow()
+        self._last_failure_time = datetime.now(timezone.utc)
         logger.warning(f"Circuit '{self.name}' forced open")
 
     def force_close(self) -> None:

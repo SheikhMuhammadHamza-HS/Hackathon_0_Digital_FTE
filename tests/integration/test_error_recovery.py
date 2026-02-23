@@ -9,7 +9,7 @@ import pytest
 import asyncio
 import logging
 from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import tempfile
 import shutil
@@ -423,7 +423,7 @@ class TestErrorRecovery:
         """Test error recovery state persistence."""
         # Simulate error state
         error_recovery_service._error_history.append({
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(timezone.utc),
             "error": "Test error",
             "category": "transient",
             "resolved": False,
@@ -521,7 +521,7 @@ class TestErrorRecovery:
         file_monitor.get_directory_status = AsyncMock(return_value={
             "watching": 5,
             "errors": 1,
-            "last_scan": datetime.utcnow()
+            "last_scan": datetime.now(timezone.utc)
         })
 
         error_recovery_service.file_monitor = file_monitor
@@ -544,7 +544,7 @@ class TestErrorRecovery:
         # Expired approval request
         expired_request = Mock()
         expired_request.status = "expired"
-        expired_request.expires_at = datetime.utcnow() - timedelta(hours=5)
+        expired_request.expires_at = datetime.now(timezone.utc) - timedelta(hours=5)
 
         mock_approval_system.check_approval_status.return_value = expired_request
 

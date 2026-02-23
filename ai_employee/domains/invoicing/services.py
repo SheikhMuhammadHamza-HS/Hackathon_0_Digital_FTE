@@ -7,7 +7,7 @@ and integration with external systems.
 
 import asyncio
 import logging
-from datetime import datetime, date, timedelta
+from datetime import datetime, timezone, date, timedelta
 from typing import List, Optional, Dict, Any, Union
 from decimal import Decimal
 
@@ -298,7 +298,7 @@ class InvoiceService(DomainService):
 
             # Update invoice status
             invoice.status = InvoiceStatus.POSTED
-            invoice.sent_at = datetime.utcnow()
+            invoice.sent_at = datetime.now(timezone.utc)
 
             # Send invoice
             await self._send_invoice(invoice)
@@ -473,7 +473,7 @@ AI Employee System
         """
         # Create workflow
         workflow = await self.workflow_engine.create_workflow(
-            workflow_id=f"invoice_workflow_{datetime.utcnow().isoformat()}",
+            workflow_id=f"invoice_workflow_{datetime.now(timezone.utc).isoformat()}",
             name="Invoice Creation Workflow",
             description="Create and post invoice with approval",
             initial_data=invoice_data

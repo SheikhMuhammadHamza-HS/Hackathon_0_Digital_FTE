@@ -9,7 +9,7 @@ import pytest
 import asyncio
 import time
 from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from ai_employee.utils.health_monitor import (
     HealthMonitor, HealthStatus, HealthCheck, Alert,
@@ -178,7 +178,7 @@ class TestHealthMonitoringIntegration:
             check_name="test_check",
             level=AlertLevel.WARNING,
             message="Test alert",
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         health_monitor.add_alert(alert)
 

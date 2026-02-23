@@ -41,7 +41,7 @@ class PaymentMatch:
         """Verify the match."""
         self.verified = True
         self.verified_by = verified_by
-        self.verified_at = datetime.utcnow()
+        self.verified_at = datetime.now(timezone.utc)
 
     def is_high_confidence(self) -> bool:
         """Check if match is high confidence."""
@@ -91,8 +91,8 @@ class PaymentMatch:
             verified=data.get('verified', False),
             verified_by=data.get('verified_by'),
             verified_at=datetime.fromisoformat(data['verified_at']) if data.get('verified_at') else None,
-            created_at=datetime.fromisoformat(data['created_at']) if data.get('created_at') else datetime.utcnow(),
-            updated_at=datetime.fromisoformat(data['updated_at']) if data.get('updated_at') else datetime.utcnow()
+            created_at=datetime.fromisoformat(data['created_at']) if data.get('created_at') else datetime.now(timezone.utc),
+            updated_at=datetime.fromisoformat(data['updated_at']) if data.get('updated_at') else datetime.now(timezone.utc)
         )
 '''
 

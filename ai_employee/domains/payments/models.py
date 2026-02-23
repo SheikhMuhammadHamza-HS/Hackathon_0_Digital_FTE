@@ -6,7 +6,7 @@ with proper validation and business logic.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import List, Optional, Dict, Any, Union
 from enum import Enum
 from decimal import Decimal
@@ -243,7 +243,7 @@ class Payment(BaseEntity):
 
         self.status = PaymentStatus.APPROVED
         self.approved_by = approved_by
-        self.approved_at = datetime.utcnow()
+        self.approved_at = datetime.now(timezone.utc)
         if notes:
             self.notes = f"{self.notes}\n\nApproved by {approved_by}: {notes}".strip()
 
@@ -274,7 +274,7 @@ class Payment(BaseEntity):
             raise ValueError(f"Cannot reconcile payment in status {self.status}")
 
         self.status = PaymentStatus.RECONCILED
-        self.reconciled_at = datetime.utcnow()
+        self.reconciled_at = datetime.now(timezone.utc)
         self.reconciled_by = reconciled_by
 
         self.update_timestamp()

@@ -2,7 +2,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..config.settings import settings
 from ..utils.file_utils import ensure_directory_exists
@@ -67,7 +67,7 @@ class TaskGenerator:
             logger.info("Duplicate task detected for %s; skipping creation", source_path)
             return None
 
-        timestamp = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
         task_filename = f"{timestamp}_{file_hash[:8]}.json"
         task_path = self.needs_action_path / task_filename
 

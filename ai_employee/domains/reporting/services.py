@@ -15,6 +15,12 @@ from .models import (
 from ...domains.invoicing.models import Invoice
 from ...domains.payments.models import Payment
 from ...domains.social_media.models import SocialPost, BrandMention
+from ...utils.performance import (
+    monitor_performance,
+    cached,
+    Optimizer,
+    cache_manager
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,14 +47,20 @@ class ReportService:
             {"service": "Social Media Tools", "cost": 49.99, "billing_cycle": "monthly"},
         ]
 
+    @monitor_performance("generate_weekly_briefing")
     async def generate_weekly_briefing(self, week_start: datetime) -> CEOBriefing:
         """Generate comprehensive weekly CEO briefing."""
         week_end = week_start + timedelta(days=7)
 
-        # Aggregate data from all domains
-        financial_data = await self._aggregate_financial_data(week_start, week_end)
-        operational_metrics = await self._compile_operational_metrics(week_start)
-        social_media_summary = await self._aggregate_social_media_data(week_start, week_end)
+        # Run data aggregation in parallel for better performance
+        tasks = await Optimizer.gather_with_concurrency(
+            self._aggregate_financial_data(week_start, week_end),
+            self._compile_operational_metrics(week_start),
+            self._aggregate_social_media_data(week_start, week_end),
+            max_concurrency=3
+        )
+
+        financial_data, operational_metrics, social_media_summary = tasks
 
         # Generate insights and suggestions
         strategic_insights = await self._generate_insights(
@@ -87,12 +99,20 @@ class ReportService:
         logger.info(f"Generated weekly briefing for {week_start.strftime('%Y-%m-%d')}")
         return briefing
 
+    @monitor_performance("aggregate_financial_data")
+    @cached(ttl=300)  # Cache for 5 minutes
     async def _aggregate_financial_data(
         self,
         start_date: datetime,
         end_date: datetime
     ) -> FinancialSummary:
         """Aggregate financial data from invoices and payments."""
+        # Check cache first
+        cache_key = f"financial_data:{start_date.isoformat()}:{end_date.isoformat()}"
+        cached_result = await cache_manager.get(cache_key)
+        if cached_result:
+            return cached_result
+
         # This would normally fetch from database/integrations
         # For now, generate realistic mock data
         summary = FinancialSummary()

@@ -6,7 +6,7 @@ and their handling logic.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from ...core.event_bus import Event, EventHandler, event_handler, handles
@@ -58,7 +58,7 @@ class InvoiceEventHandler(EventHandler):
             "invoice_number": event.invoice_number,
             "client_id": event.client_id,
             "amount": event.total_amount,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
         # Trigger any automated follow-ups
@@ -77,7 +77,7 @@ class InvoiceEventHandler(EventHandler):
             "invoice_id": event.invoice_id,
             "invoice_number": event.invoice_number,
             "posted_by": event.posted_by,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
         # Schedule payment reminders
