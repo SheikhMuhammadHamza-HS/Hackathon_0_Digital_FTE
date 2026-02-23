@@ -6,7 +6,7 @@ These tests validate the complete invoice creation and approval workflow.
 
 import pytest
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import tempfile
 import shutil
@@ -180,7 +180,7 @@ class TestInvoiceWorkflow:
             item_type="invoice",
             item_id=invoice.id,
             amount=invoice.total_amount,
-            expires_at=datetime.utcnow() - timedelta(hours=1)  # Expired
+            expires_at=datetime.now(timezone.utc) - timedelta(hours=1)  # Expired
         )
         approval_request.status = ApprovalStatus.EXPIRED
 

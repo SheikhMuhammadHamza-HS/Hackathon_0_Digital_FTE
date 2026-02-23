@@ -9,7 +9,7 @@ import asyncio
 import psutil
 import json
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Callable, Union, Tuple
@@ -200,7 +200,7 @@ class HealthMonitor:
 
         # System info cache
         self._boot_time = datetime.fromtimestamp(psutil.boot_time())
-        self._start_time = datetime.utcnow()
+        self._start_time = datetime.now(timezone.utc)
 
         # Initialize default checks
         self._setup_default_checks()
@@ -436,8 +436,8 @@ class HealthMonitor:
                 await self._run_custom_check(check)
 
             # Update timestamps
-            check.last_check = datetime.utcnow()
-            check.last_success = datetime.utcnow()
+            check.last_check = datetime.now(timezone.utc)
+            check.last_success = datetime.now(timezone.utc)
             check.consecutive_failures = 0
             check.error_message = None
 
@@ -450,8 +450,8 @@ class HealthMonitor:
 
         except Exception as e:
             self.logger.error(f"Health check '{name}' failed: {e}")
-            check.last_check = datetime.utcnow()
-            check.last_failure = datetime.utcnow()
+            check.last_check = datetime.now(timezone.utc)
+            check.last_failure = datetime.now(timezone.utc)
             check.consecutive_failures += 1
             check.error_message = str(e)
             check.status = HealthStatus.CRITICAL if check.consecutive_failures >= check.retries else HealthStatus.UNHEALTHY
@@ -767,10 +767,10 @@ class HealthMonitor:
     def _track_uptime(self, check_name: str, is_healthy: bool) -> None:
         """Track uptime for a health check."""
         tracker = self._uptime_tracker[check_name]
-        tracker.append((datetime.utcnow(), is_healthy))
+        tracker.append((datetime.now(timezone.utc), is_healthy))
 
         # Keep only last 24 hours
-        cutoff = datetime.utcnow() - timedelta(hours=24)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
         self._uptime_tracker[check_name] = [
             (t, h) for t, h in tracker if t > cutoff
         ]
@@ -789,7 +789,7 @@ class HealthMonitor:
         if not tracker:
             return 0.0
 
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         recent_checks = [(t, h) for t, h in tracker if t > cutoff]
 
         if not recent_checks:
@@ -928,7 +928,7 @@ class HealthMonitor:
         alert = self._active_alerts[alert_id]
         alert.acknowledged = True
         alert.acknowledged_by = acknowledged_by
-        alert.acknowledged_at = datetime.utcnow()
+        alert.acknowledged_at = datetime.now(timezone.utc)
 
         self.logger.info(f"Alert {alert_id} acknowledged by {acknowledged_by}")
         return True
@@ -947,7 +947,7 @@ class HealthMonitor:
 
         alert = self._active_alerts[alert_id]
         alert.resolved = True
-        alert.resolved_at = datetime.utcnow()
+        alert.resolved_at = datetime.now(timezone.utc)
 
         # Remove from active alerts
         del self._active_alerts[alert_id]
@@ -1008,7 +1008,7 @@ class HealthMonitor:
                 report = await self.generate_health_report()
 
                 # Save report to file
-                report_file = self.config.paths.reports_path / f"health_report_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+                report_file = self.config.paths.reports_path / f"health_report_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
                 report_file.parent.mkdir(parents=True, exist_ok=True)
 
                 async with aiofiles.open(report_file, 'w') as f:
@@ -1031,13 +1031,13 @@ class HealthMonitor:
         while not self._shutdown_event.is_set():
             try:
                 # Clean old metrics history (keep last 7 days)
-                cutoff = datetime.utcnow() - timedelta(days=7)
+                cutoff = datetime.now(timezone.utc) - timedelta(days=7)
                 for metric_name, history in self._metrics_history.items():
                     while history and history[0]["timestamp"] < cutoff:
                         history.popleft()
 
                 # Clean old alert history (keep last 30 days)
-                alert_cutoff = datetime.utcnow() - timedelta(days=30)
+                alert_cutoff = datetime.now(timezone.utc) - timedelta(days=30)
                 self._alert_history = [
                     alert for alert in self._alert_history
                     if alert.timestamp > alert_cutoff

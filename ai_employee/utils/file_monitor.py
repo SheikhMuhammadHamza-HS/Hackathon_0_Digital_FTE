@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Callable, Optional, Set, Any
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 import hashlib
 import json
@@ -191,7 +191,7 @@ class DocumentProcessor(FileProcessor):
             'category': 'document',
             'size': file_event.file_size,
             'mime_type': file_event.mime_type,
-            'processed_at': datetime.utcnow().isoformat()
+            'processed_at': datetime.now(timezone.utc).isoformat()
         }
 
         # Extract text content based on file type
@@ -259,7 +259,7 @@ class ImageProcessor(FileProcessor):
             'category': 'image',
             'size': file_event.file_size,
             'mime_type': file_event.mime_type,
-            'processed_at': datetime.utcnow().isoformat()
+            'processed_at': datetime.now(timezone.utc).isoformat()
         }
 
         # Extract image metadata
@@ -410,7 +410,7 @@ class FileSystemEventHandler(FileSystemEventHandler):
             event_type=event_type,
             file_path=file_path,
             is_directory=file_path.is_dir(),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             source_path=source_path,
             file_size=file_size,
             file_hash=file_hash,

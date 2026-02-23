@@ -7,7 +7,7 @@ and should pass before any implementation exists.
 
 import pytest
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
 import json
 
@@ -51,8 +51,8 @@ class TestPaymentContracts:
                     "status": "pending",
                     "payment_method": data["payment_method"],
                     "bank_reference": data.get("bank_reference"),
-                    "created_at": datetime.utcnow().isoformat(),
-                    "updated_at": datetime.utcnow().isoformat()
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
                 }
                 return payment
 
@@ -69,7 +69,7 @@ class TestPaymentContracts:
                     "status": "reconciled",
                     "payment_method": "bank_transfer",
                     "bank_reference": "TXN123456",
-                    "created_at": datetime.utcnow().isoformat()
+                    "created_at": datetime.now(timezone.utc).isoformat()
                 }
 
             async def list_payments(self, status: str = None, limit: int = 50, offset: int = 0) -> Dict[str, Any]:
@@ -83,7 +83,7 @@ class TestPaymentContracts:
                             "status": "reconciled",
                             "payment_date": "2025-02-21",
                             "payment_method": "bank_transfer",
-                            "created_at": datetime.utcnow().isoformat()
+                            "created_at": datetime.now(timezone.utc).isoformat()
                         }
                     ],
                     "total": 1,
@@ -99,7 +99,7 @@ class TestPaymentContracts:
                 return {
                     "id": payment_id,
                     "status": "reconciled",
-                    "reconciled_at": datetime.utcnow().isoformat(),
+                    "reconciled_at": datetime.now(timezone.utc).isoformat(),
                     "matched_invoice_id": "inv_123"
                 }
 
@@ -354,7 +354,7 @@ class TestPaymentContracts:
     async def test_payment_date_validation_contract(self, payment_client):
         """Test payment date validation contract."""
         # Given payment with future date
-        future_date = (datetime.utcnow() + timedelta(days=30)).strftime("%Y-%m-%d")
+        future_date = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y-%m-%d")
         payment_data = {
             "invoice_id": "inv_123",
             "amount": 100.00,

@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 
@@ -18,7 +18,11 @@ class DraftStore:
     """
 
     def __init__(self, pending_dir: str | Path = None):
-        self.pending_dir = Path(pending_dir) if pending_dir else Path(settings.PENDING_APPROVAL_PATH)
+        if pending_dir:
+            self.pending_dir = Path(pending_dir)
+        else:
+            # Use absolute path from project root
+            self.pending_dir = Path(settings.BASE_DIR) / settings.PENDING_APPROVAL_PATH
         self.pending_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"DraftStore initialized with directory: {self.pending_dir}")
 
@@ -64,7 +68,7 @@ class DraftStore:
         Path
             Absolute path to the created draft file.
         """
-        timestamp = datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         safe_subject = self._sanitize_filename(subject)[:50]
         filename = f"{timestamp}_{safe_subject}.md"
         draft_path = self.pending_dir / filename

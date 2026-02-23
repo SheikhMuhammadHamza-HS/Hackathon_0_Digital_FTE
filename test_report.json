@@ -1,0 +1,201 @@
+{
+  "timestamp": "2026-02-23T12:21:09.578061",
+  "summary": {
+    "total": 27,
+    "passed": 14,
+    "failed": 13,
+    "warnings": 0,
+    "pass_rate": 51.85185185185185
+  },
+  "results": [
+    {
+      "test": "Error Classes",
+      "status": "PASS",
+      "message": "All custom error classes imported successfully",
+      "timestamp": "2026-02-23T12:20:56.281485",
+      "details": {}
+    },
+    {
+      "test": "404 Error Handling",
+      "status": "FAIL",
+      "message": "Error testing 404: Invalid password: Password must be at least 12 characters, Password must contain uppercase letters, Password must contain special characters",
+      "timestamp": "2026-02-23T12:20:57.147162",
+      "details": {}
+    },
+    {
+      "test": "Validation Error",
+      "status": "FAIL",
+      "message": "Error testing validation: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/clients (Caused by NewConnectionError(\"HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it\"))",
+      "timestamp": "2026-02-23T12:21:01.199036",
+      "details": {}
+    },
+    {
+      "test": "Cache Manager",
+      "status": "PASS",
+      "message": "Cache manager initialized",
+      "timestamp": "2026-02-23T12:21:01.199692",
+      "details": {}
+    },
+    {
+      "test": "Cache Operations",
+      "status": "PASS",
+      "message": "Cache set/get working",
+      "timestamp": "2026-02-23T12:21:01.200250",
+      "details": {}
+    },
+    {
+      "test": "Performance Monitor",
+      "status": "FAIL",
+      "message": "Performance monitor error: 'PerformanceMonitor' object has no attribute 'measure'",
+      "timestamp": "2026-02-23T12:21:01.200349",
+      "details": {}
+    },
+    {
+      "test": "JWT Authentication",
+      "status": "FAIL",
+      "message": "JWT error: TokenManager.__init__() missing 1 required positional argument: 'secret_key'",
+      "timestamp": "2026-02-23T12:21:01.201095",
+      "details": {}
+    },
+    {
+      "test": "Rate Limiting",
+      "status": "FAIL",
+      "message": "Rate limiter error: cannot import name 'RateLimiter' from 'ai_employee.utils.security' (D:\\hackathon_zero\\ai_employee\\utils\\security.py)",
+      "timestamp": "2026-02-23T12:21:01.201307",
+      "details": {}
+    },
+    {
+      "test": "Input Validation",
+      "status": "FAIL",
+      "message": "Validator error: 'InputValidator' object has no attribute 'sanitize_input'",
+      "timestamp": "2026-02-23T12:21:01.202298",
+      "details": {}
+    },
+    {
+      "test": "Data Retention Manager",
+      "status": "FAIL",
+      "message": "Retention manager error: 'DataRetentionManager' object has no attribute 'create_policy'",
+      "timestamp": "2026-02-23T12:21:01.218702",
+      "details": {}
+    },
+    {
+      "test": "Retention Scheduling",
+      "status": "FAIL",
+      "message": "Scheduling error: 'RetentionTaskManager' object has no attribute 'schedule_retention_task'",
+      "timestamp": "2026-02-23T12:21:01.226313",
+      "details": {}
+    },
+    {
+      "test": "GDPR Manager",
+      "status": "FAIL",
+      "message": "GDPR manager error: 'GDPRManager' object has no attribute 'register_data_subject'",
+      "timestamp": "2026-02-23T12:21:01.253217",
+      "details": {}
+    },
+    {
+      "test": "Dashboard File: index.html",
+      "status": "PASS",
+      "message": "Exists (21109 bytes)",
+      "timestamp": "2026-02-23T12:21:01.254739",
+      "details": {}
+    },
+    {
+      "test": "Dashboard File: dashboard.css",
+      "status": "PASS",
+      "message": "Exists (3435 bytes)",
+      "timestamp": "2026-02-23T12:21:01.255536",
+      "details": {}
+    },
+    {
+      "test": "Dashboard File: dashboard.js",
+      "status": "PASS",
+      "message": "Exists (15310 bytes)",
+      "timestamp": "2026-02-23T12:21:01.256366",
+      "details": {}
+    },
+    {
+      "test": "Monitoring Dashboard",
+      "status": "FAIL",
+      "message": "Monitoring error: 'MonitoringDashboard' object has no attribute 'collect_system_metrics'",
+      "timestamp": "2026-02-23T12:21:01.266201",
+      "details": {}
+    },
+    {
+      "test": "Monitoring Health Endpoint",
+      "status": "FAIL",
+      "message": "Endpoint error: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/monitoring/health (Caused by NewConnectionError(\"HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it\"))",
+      "timestamp": "2026-02-23T12:21:05.348634",
+      "details": {}
+    },
+    {
+      "test": "Backup Creation",
+      "status": "FAIL",
+      "message": "'MockConfig' object has no attribute 'CONFIG_PATH'",
+      "timestamp": "2026-02-23T12:21:05.502642",
+      "details": {}
+    },
+    {
+      "test": "Backup Statistics API",
+      "status": "FAIL",
+      "message": "API error: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/backup/statistics (Caused by NewConnectionError(\"HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it\"))",
+      "timestamp": "2026-02-23T12:21:09.556527",
+      "details": {}
+    },
+    {
+      "test": "Documentation: Deployment Guide",
+      "status": "PASS",
+      "message": "Exists (19071 bytes, 889 lines)",
+      "timestamp": "2026-02-23T12:21:09.560915",
+      "details": {}
+    },
+    {
+      "test": "Documentation: Docker Deployment",
+      "status": "PASS",
+      "message": "Exists (13443 bytes, 657 lines)",
+      "timestamp": "2026-02-23T12:21:09.562346",
+      "details": {}
+    },
+    {
+      "test": "Documentation: AWS Deployment",
+      "status": "PASS",
+      "message": "Exists (22749 bytes, 801 lines)",
+      "timestamp": "2026-02-23T12:21:09.564214",
+      "details": {}
+    },
+    {
+      "test": "Documentation: Backup Guide",
+      "status": "PASS",
+      "message": "Exists (11509 bytes, 444 lines)",
+      "timestamp": "2026-02-23T12:21:09.565923",
+      "details": {}
+    },
+    {
+      "test": "Documentation: GDPR Guide",
+      "status": "PASS",
+      "message": "Exists (6915 bytes, 237 lines)",
+      "timestamp": "2026-02-23T12:21:09.567923",
+      "details": {}
+    },
+    {
+      "test": "Documentation: Security Guide",
+      "status": "PASS",
+      "message": "Exists (9921 bytes, 450 lines)",
+      "timestamp": "2026-02-23T12:21:09.571019",
+      "details": {}
+    },
+    {
+      "test": "Documentation: Deployment Checklist",
+      "status": "PASS",
+      "message": "Exists (7300 bytes, 255 lines)",
+      "timestamp": "2026-02-23T12:21:09.573640",
+      "details": {}
+    },
+    {
+      "test": "Documentation: Quickstart Guide",
+      "status": "PASS",
+      "message": "Exists (14614 bytes, 526 lines)",
+      "timestamp": "2026-02-23T12:21:09.575176",
+      "details": {}
+    }
+  ]
+}

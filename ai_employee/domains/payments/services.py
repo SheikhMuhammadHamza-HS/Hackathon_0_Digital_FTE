@@ -7,7 +7,7 @@ and bank transaction matching.
 
 import asyncio
 import logging
-from datetime import datetime, date, timedelta
+from datetime import datetime, timezone, date, timedelta
 from typing import List, Optional, Dict, Any, Tuple, Union
 from decimal import Decimal
 import re
@@ -630,7 +630,7 @@ class PaymentService(DomainService):
         """
         # Create workflow
         workflow = await self.workflow_engine.create_workflow(
-            workflow_id=f"payment_workflow_{datetime.utcnow().isoformat()}",
+            workflow_id=f"payment_workflow_{datetime.now(timezone.utc).isoformat()}",
             name="Payment Reconciliation Workflow",
             description="Reconcile payment with approval",
             initial_data=payment_data

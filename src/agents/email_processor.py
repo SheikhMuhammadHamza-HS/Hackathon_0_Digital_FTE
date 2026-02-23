@@ -2,6 +2,9 @@ import time
 import json
 from pathlib import Path
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
+
 import google.generativeai as genai
 
 from ..config import settings

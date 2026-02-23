@@ -1,7 +1,7 @@
 """Fixed PaymentMatch class without BaseEntity inheritance."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 import uuid
 
@@ -44,7 +44,7 @@ class PaymentMatch:
         """Verify the match."""
         self.verified = True
         self.verified_by = verified_by
-        self.verified_at = datetime.utcnow()
+        self.verified_at = datetime.now(timezone.utc)
 
     def get_confidence_level(self) -> str:
         """Get confidence level description."""
@@ -80,11 +80,11 @@ class PaymentMatch:
         if data.get('verified_at'):
             verified_at = datetime.fromisoformat(data['verified_at'])
 
-        created_at = datetime.utcnow()
+        created_at = datetime.now(timezone.utc)
         if data.get('created_at'):
             created_at = datetime.fromisoformat(data['created_at'])
 
-        updated_at = datetime.utcnow()
+        updated_at = datetime.now(timezone.utc)
         if data.get('updated_at'):
             updated_at = datetime.fromisoformat(data['updated_at'])
 

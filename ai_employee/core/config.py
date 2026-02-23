@@ -104,6 +104,22 @@ class PerformanceConfig:
 
 
 @dataclass
+class BackupConfig:
+    """Backup and restore configuration."""
+    backup_directory: str = "backups"
+    encryption_enabled: bool = True
+    compression_level: int = 6
+    max_backup_size_gb: int = 10
+    retention_days_daily: int = 7
+    retention_days_weekly: int = 28
+    retention_days_monthly: int = 365
+    auto_backup_enabled: bool = True
+    backup_schedule_daily: str = "0 2 * * *"  # 2 AM
+    backup_schedule_weekly: str = "0 3 * * 0"  # Sunday 3 AM
+    backup_schedule_monthly: str = "0 4 1 * *"  # 1st of month 4 AM
+
+
+@dataclass
 class PathsConfig:
     """File system paths configuration."""
     vault_path: Path
@@ -140,6 +156,7 @@ class AppConfig:
     security: Optional[SecurityConfig] = None
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     performance: PerformanceConfig = field(default_factory=PerformanceConfig)
+    backup: BackupConfig = field(default_factory=BackupConfig)
     paths: Optional[PathsConfig] = None
 
 

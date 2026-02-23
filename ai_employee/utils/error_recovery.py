@@ -10,7 +10,7 @@ import logging
 import os
 import shutil
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Callable, Union
@@ -706,7 +706,7 @@ class ErrorRecoveryService:
         try:
             retry_info = {
                 "operation": operation,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(timezone.utc),
                 "retry_count": 0
             }
             asyncio.create_task(self._retry_queue.put(retry_info))
@@ -741,7 +741,7 @@ class ErrorRecoveryService:
             review_info = {
                 "operation": operation,
                 "context": context,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(timezone.utc),
                 "status": "pending_review"
             }
             asyncio.create_task(self._review_queue.put(review_info))
@@ -769,7 +769,7 @@ class ErrorRecoveryService:
             quarantine_dir.mkdir(parents=True, exist_ok=True)
 
             # Move file to quarantine
-            quarantine_path = quarantine_dir / f"{source.name}.{datetime.utcnow().isoformat()}"
+            quarantine_path = quarantine_dir / f"{source.name}.{datetime.now(timezone.utc).isoformat()}"
             shutil.move(str(source), str(quarantine_path))
 
             logger.info(f"Quarantined file: {source} -> {quarantine_path}")
@@ -810,7 +810,7 @@ class ErrorRecoveryService:
             "error": str(error),
             "traceback": traceback.format_exc(),
             "context": context,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "severity": self._get_escalation_level(error)
         }
 
@@ -882,7 +882,7 @@ class ErrorRecoveryService:
         # In a real implementation, this would update dashboard service
         status_data = {
             "status": "error",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "active_errors": len(self._error_history),
             "active_rollbacks": len(self._active_rollbacks)
         }
@@ -890,7 +890,7 @@ class ErrorRecoveryService:
 
     def _clear_resolved_errors(self) -> None:
         """Clear resolved errors from history."""
-        cutoff = datetime.utcnow() - timedelta(hours=24)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
         self._error_history = [
             error for error in self._error_history
             if error["timestamp"] > cutoff and not error.get("resolved", False)
@@ -914,7 +914,7 @@ class ErrorRecoveryService:
         approval_request = {
             "operation": operation,
             "payment_data": payment_data,
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(timezone.utc),
             "status": "pending"
         }
 
@@ -939,7 +939,7 @@ class ErrorRecoveryService:
         retry_info = {
             "operation": operation,
             "payment_id": payment_id,
-            "retry_after": datetime.utcnow() + timedelta(hours=1)
+            "retry_after": datetime.now(timezone.utc) + timedelta(hours=1)
         }
 
         # Schedule retry
@@ -965,7 +965,7 @@ class ErrorRecoveryService:
         """
         # Add to error history
         error_record = {
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(timezone.utc),
             "operation": operation,
             "category": category.value,
             "message": error_message,
@@ -1006,10 +1006,10 @@ class ErrorRecoveryService:
 
         retry_info = {
             "operation": operation,
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(timezone.utc),
             "retry_count": 0,
             "max_retries": strategy.max_retries,
-            "next_retry": datetime.utcnow() + timedelta(seconds=retry_delay),
+            "next_retry": datetime.now(timezone.utc) + timedelta(seconds=retry_delay),
             "backoff_factor": strategy.backoff_factor,
             "base_delay": strategy.base_delay
         }
@@ -1083,7 +1083,7 @@ class ErrorRecoveryService:
             return False
 
         # Clean files older than 7 days
-        cutoff = datetime.utcnow() - timedelta(days=7)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
         cleaned = 0
 
         for file_path in directory.rglob("*"):
@@ -1129,7 +1129,7 @@ class ErrorRecoveryService:
                     continue
 
                 # Check retry time
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
                 retry_time = retry_info.get("next_retry", now)
 
                 if now < retry_time:
@@ -1182,7 +1182,7 @@ class ErrorRecoveryService:
                 # Monitor error rates
                 recent_errors = [
                     e for e in self._error_history
-                    if e["timestamp"] > datetime.utcnow() - timedelta(minutes=5)
+                    if e["timestamp"] > datetime.now(timezone.utc) - timedelta(minutes=5)
                 ]
 
                 if len(recent_errors) > 10:
@@ -1202,7 +1202,7 @@ class ErrorRecoveryService:
                 self._clear_resolved_errors()
 
                 # Clean up old rollbacks
-                cutoff = datetime.utcnow() - timedelta(hours=24)
+                cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
                 old_rollbacks = [
                     op_id for op_id, info in self._active_rollbacks.items()
                     if info.timestamp < cutoff
@@ -1225,7 +1225,7 @@ class ErrorRecoveryService:
             """Check error rate over last 5 minutes."""
             recent_errors = [
                 e for e in self._error_history
-                if e["timestamp"] > datetime.utcnow() - timedelta(minutes=5)
+                if e["timestamp"] > datetime.now(timezone.utc) - timedelta(minutes=5)
             ]
 
             error_rate = len(recent_errors) / 5.0  # errors per minute

@@ -7,7 +7,7 @@ and template management.
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Union
 from pathlib import Path
 import smtplib
@@ -145,7 +145,7 @@ class EmailService:
         """
         try:
             # Add invoice tracking to body
-            tracked_body = f"{body}\n\n---\nInvoice ID: {invoice_id}\nSent: {datetime.utcnow().isoformat()}"
+            tracked_body = f"{body}\n\n---\nInvoice ID: {invoice_id}\nSent: {datetime.now(timezone.utc).isoformat()}"
 
             return await self.send_email(
                 to_email=to_email,

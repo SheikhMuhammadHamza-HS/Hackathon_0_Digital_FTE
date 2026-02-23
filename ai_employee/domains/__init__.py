@@ -11,7 +11,7 @@ services, and events:
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 import uuid
 import json
@@ -63,7 +63,7 @@ class BaseEntity:
 
     def update_timestamp(self) -> None:
         """Update the updated_at timestamp."""
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
     def add_metadata(self, key: str, value: Any) -> None:
         """Add metadata.

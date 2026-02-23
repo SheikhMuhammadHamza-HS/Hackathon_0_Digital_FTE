@@ -1,6 +1,6 @@
 # AI Employee System - Quick Start Guide
 
-**Version**: 1.0.0 | **Date**: 2025-02-21 | **Target**: Small Business (1-10 employees)
+**Version**: 1.0.0 | **Date**: 2026-02-23 | **Target**: Small Business (1-10 employees)
 
 ## Overview
 
@@ -9,8 +9,8 @@ The AI Employee system is a fully autonomous business operations assistant desig
 ## Prerequisites
 
 ### System Requirements
-- **Operating System**: Linux (Ubuntu 20.04+) or Windows 10/11 with WSL2
-- **Python**: 3.11 or higher
+- **Operating System**: Linux (Ubuntu 20.04+) or Windows 10/11 with WSL2 or macOS
+- **Python**: 3.11 or higher (3.13 recommended)
 - **Memory**: Minimum 4GB RAM (8GB recommended)
 - **Storage**: 10GB free space
 - **Network**: Stable internet connection for API integrations
@@ -28,24 +28,31 @@ The AI Employee system is a fully autonomous business operations assistant desig
 
 ### 1. Clone Repository
 ```bash
-git clone <repository-url>
-cd ai_employee
+git clone https://github.com/your-org/ai-employee.git
+cd ai-employee
 ```
 
 ### 2. Create Virtual Environment
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Linux/macOS:
+source venv/bin/activate
+# Windows:
+venv\Scripts\activate
 ```
 
 ### 3. Install Dependencies
 ```bash
+# Install core dependencies
 pip install -r requirements.txt
+
+# Install optional dependencies for full functionality
+pip install -r requirements-optional.txt
 ```
 
 ### 4. Environment Configuration
 ```bash
-cp .env.example .env
+cp ai_employee/.env.example ai_employee/.env
 ```
 
 Edit `.env` with your configuration:
@@ -86,15 +93,44 @@ APPROVAL_TIMEOUT_HOURS=4
 
 ### 5. Initialize File Structure
 ```bash
-# Create required directories
-mkdir -p /Vault/Inbox /Vault/Needs_Action /Vault/Done /Vault/Logs
-mkdir -p /Vault/Pending_Approval /Vault/Approved /Vault/Rejected
-mkdir -p /Vault/Reports /Vault/Archive
+# Create required directories (adjust path for your OS)
+# Linux/macOS:
+mkdir -p ~/Vault/Inbox ~/Vault/Needs_Action ~/Vault/Done ~/Vault/Logs
+mkdir -p ~/Vault/Pending_Approval ~/Vault/Approved ~/Vault/Rejected
+mkdir -p ~/Vault/Reports ~/Vault/Archive
+
+# Windows:
+mkdir %USERPROFILE%\Vault\Inbox %USERPROFILE%\Vault\Needs_Action %USERPROFILE%\Vault\Done %USERPROFILE%\Vault\Logs
+mkdir %USERPROFILE%\Vault\Pending_Approval %USERPROFILE%\Vault\Approved %USERPROFILE%\Vault\Rejected
+mkdir %USERPROFILE%\Vault\Reports %USERPROFILE%\Vault\Archive
 ```
 
-### 6. Start the System
+### 6. Verify Installation
 ```bash
-python main.py
+# Test core functionality
+cd ai_employee
+python -c "from ai_employee.core.config import Config; print('Configuration OK')"
+
+# Run health check
+python -m ai_employee.utils.health_monitor
+```
+
+### 7. Start the System
+```bash
+# Start main system
+python ai_employee/main.py
+
+# Or start with API server
+python ai_employee/api/server.py
+```
+
+### 8. Verify System Status
+```bash
+# Check system health
+curl http://localhost:8000/api/v1/health
+
+# Check available endpoints
+curl http://localhost:8000/docs
 ```
 
 ## Initial Setup
@@ -118,7 +154,7 @@ python main.py
 4. Update `.env` with email settings
 
 ### 4. Create First Client (Optional)
-```python
+```bash
 # Use the API to create your first client
 curl -X POST http://localhost:8000/api/v1/clients \
   -H "Content-Type: application/json" \
@@ -128,16 +164,29 @@ curl -X POST http://localhost:8000/api/v1/clients \
     "address": "123 Main St, City, State 12345",
     "phone": "+1-555-0123"
   }'
+
+# Or use the Python client
+python -c "
+from ai_employee.domains.invoicing.services import InvoiceService
+service = InvoiceService()
+client = service.create_client(
+    name='Example Client',
+    email='client@example.com',
+    address='123 Main St, City, State 12345',
+    phone='+1-555-0123'
+)
+print(f'Client created: {client.id}')
+"
 ```
 
 ## Daily Operations
 
 ### Invoice Workflow
-1. **Client sends invoice request** → File appears in `/Vault/Inbox`
+1. **Client sends invoice request** → File appears in `~/Vault/Inbox`
 2. **AI processes request** → Creates draft invoice in Odoo
-3. **Approval required** → File created in `/Vault/Pending_Approval`
-4. **Human reviews** → Move file to `/Vault/Approved`
-5. **AI posts invoice** → Invoice sent to client, file moved to `/Vault/Done`
+3. **Approval required** → File created in `~/Vault/Pending_Approval`
+4. **Human reviews** → Move file to `~/Vault/Approved`
+5. **AI posts invoice** → Invoice sent to client, file moved to `~/Vault/Done`
 
 ### Payment Reconciliation
 1. **Bank transaction detected** → AI matches to open invoices
@@ -154,14 +203,85 @@ curl -X POST http://localhost:8000/api/v1/clients \
 ### CEO Briefing
 1. **Monday 8 AM** → Automatic briefing generation
 2. **Data aggregated** → Financial, operational, social metrics
-3. **Report delivered** → Emailed to CEO, saved in `/Vault/Reports`
+3. **Report delivered** → Emailed to CEO, saved in `~/Vault/Reports`
 4. **Suggestions provided** → Actionable business insights
+
+### Running CEO Briefing Manually
+```bash
+# Generate current week briefing
+python -c "
+from ai_employee.domains.reporting.services import ReportService
+from ai_employee.utils.briefing_scheduler import BriefingScheduler
+service = ReportService()
+scheduler = BriefingScheduler()
+briefing = scheduler.generate_briefing()
+print(briefing)
+"
+```
+
+## Backup and Restore
+
+### Automatic Backups
+The system automatically creates backups:
+- **Daily**: 2:00 AM (7-day retention)
+- **Weekly**: Sunday 3:00 AM (4-week retention)
+- **Monthly**: 1st of month 4:00 AM (1-year retention)
+
+### Manual Backup
+```bash
+# Create immediate backup
+curl -X POST http://localhost:8000/api/v1/backup/create \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "backup_type": "manual",
+    "include_media": true,
+    "encrypt": true,
+    "comment": "Pre-maintenance backup"
+  }'
+```
+
+### List Backups
+```bash
+# View all backups
+curl -X GET http://localhost:8000/api/v1/backup/list \
+  -H "Authorization: Bearer <token>"
+
+# Check backup statistics
+curl -X GET http://localhost:8000/api/v1/backup/statistics \
+  -H "Authorization: Bearer <token>"
+```
+
+### Restore from Backup
+⚠️ **Warning**: Restore overwrites existing data
+```bash
+curl -X POST http://localhost:8000/api/v1/backup/restore \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "backup_id": "backup_manual_20240123_143022",
+    "restore_components": ["database", "config"],
+    "force": true
+  }'
+```
+
+### Backup Configuration
+Add to `.env`:
+```bash
+# Backup Settings
+BACKUP_DIRECTORY=backups
+BACKUP_ENCRYPTION_ENABLED=true
+AUTO_BACKUP_ENABLED=true
+BACKUP_RETENTION_DAILY=7
+BACKUP_RETENTION_WEEKLY=28
+BACKUP_RETENTION_MONTHLY=365
+```
 
 ## File-Based Approval System
 
 ### Directory Structure
 ```
-/Vault/
+~/Vault/ (or %USERPROFILE%\Vault on Windows)
 ├── Inbox/                 # Incoming requests
 ├── Needs_Action/          # Processing queue
 ├── Pending_Approval/      # Awaiting human review
@@ -172,6 +292,11 @@ curl -X POST http://localhost:8000/api/v1/clients \
 ├── Reports/              # Generated reports
 └── Archive/              # Old records
 ```
+
+### Configuration File Location
+- **Linux/macOS**: `~/.config/ai-employee/config.yaml`
+- **Windows**: `%APPDATA%\ai-employee\config.yaml`
+- **Environment**: `ai_employee/.env` (overrides config file)
 
 ### Approval Process
 1. **File appears in `/Vault/Pending_Approval`**
@@ -207,21 +332,41 @@ Generated: 2025-02-21 10:30:00
 ## Monitoring and Maintenance
 
 ### Health Checks
-- **System status**: `GET /api/v1/health`
+- **System status**: `GET http://localhost:8000/api/v1/health`
 - **Service monitoring**: Automatic watchdog process
-- **Error tracking**: Comprehensive logging in `/Vault/Logs`
+- **Error tracking**: Comprehensive logging in `~/Vault/Logs`
+- **Circuit breaker status**: `GET http://localhost:8000/api/v1/circuit-breaker/status`
 
 ### Log Management
-- **Location**: `/Vault/Logs/`
-- **Retention**: 2 years (configurable)
+- **Location**: `~/Vault/Logs/` (or `%USERPROFILE%\Vault\Logs`)
+- **Retention**: 2 years (configurable via `DATA_RETENTION_DAYS`)
 - **Levels**: DEBUG, INFO, WARNING, ERROR, CRITICAL
 - **Rotation**: Daily log files with automatic cleanup
+- **Format**: Structured JSON for easy parsing
 
 ### Backup Procedures
 1. **Database backup**: Odoo PostgreSQL backup
-2. **File backup**: `/Vault` directory backup
+   ```bash
+   pg_dump odoo_db > backup_$(date +%Y%m%d).sql
+   ```
+2. **File backup**: `~/Vault` directory backup
+   ```bash
+   tar -czf vault_backup_$(date +%Y%m%d).tar.gz ~/Vault/
+   ```
 3. **Configuration backup**: `.env` file backup
-4. **Schedule**: Daily automated backups
+4. **Schedule**: Daily automated backups via cron/systemd timer
+
+### Performance Monitoring
+```bash
+# Check system metrics
+curl http://localhost:8000/api/v1/metrics
+
+# View active services
+curl http://localhost:8000/api/v1/services/status
+
+# Check rate limiting status
+curl http://localhost:8000/api/v1/rate-limits/status
+```
 
 ## Troubleshooting
 
@@ -261,7 +406,35 @@ python --version
 pip check
 
 # Check configuration
-python -c "from core.config import Config; print(Config.validate())"
+python -c "from ai_employee.core.config import Config; print(Config.validate())"
+
+# Check all services
+python -m ai_employee.utils.health_monitor --verbose
+```
+
+#### API Server Issues
+```bash
+# Check if server is running
+curl http://localhost:8000/api/v1/health
+
+# Restart server
+pkill -f "ai_employee.api.server"
+python ai_employee/api/server.py
+
+# Check logs
+tail -f ~/Vault/Logs/api_server.log
+```
+
+#### Integration Test Failures
+```bash
+# Run all tests
+python -m pytest tests/integration/ -v
+
+# Run specific test suite
+python -m pytest tests/integration/test_briefing_generation.py -v
+
+# Check test coverage
+python -m pytest --cov=ai_employee tests/
 ```
 
 ### Error Recovery
@@ -284,12 +457,70 @@ The system includes automatic error recovery with:
 3. **Review configuration**: Ensure all `.env` settings are correct
 4. **Contact support**: Provide logs and system details
 
+## Testing Your Installation
+
+### 1. Run Integration Tests
+```bash
+# Test all core functionality
+python -m pytest tests/integration/ -v
+
+# Expected output: All tests should pass
+# test_briefing_generation.py: 17/17 passed
+# test_data_aggregation_fixed.py: 7/7 passed
+# test_invoice_workflow.py: 5/5 passed
+# test_social_media.py: 4/4 passed
+```
+
+### 2. Test CEO Briefing Generation
+```bash
+# Generate a test briefing
+python -c "
+from ai_employee.domains.reporting.services import ReportService
+import datetime
+service = ReportService()
+briefing = service.generate_weekly_briefing(
+    start_date=datetime.date(2026, 2, 17),
+    end_date=datetime.date(2026, 2, 23)
+)
+print('Briefing generated successfully:', briefing.id)
+"
+```
+
+### 3. Test Social Media Integration
+```bash
+# Test rate limiting
+python -c "
+from ai_employee.domains.social_media.rate_limiter import RateLimiter
+limiter = RateLimiter()
+print('Rate limiter initialized:', limiter.platforms)
+"
+```
+
 ## Next Steps
 
 1. **Complete initial setup** following this guide
-2. **Test with sample data** before production use
-3. **Configure monitoring** and alerting preferences
-4. **Schedule regular backups** and maintenance
-5. **Train team members** on approval workflows
+2. **Run integration tests** to verify all components work
+3. **Test with sample data** before production use
+4. **Configure monitoring** and alerting preferences
+5. **Schedule regular backups** and maintenance
+6. **Train team members** on approval workflows
+
+## Production Deployment Checklist
+
+- [ ] All integration tests passing
+- [ ] Environment variables configured
+- [ ] SSL certificates installed (for production)
+- [ ] Backup procedures tested
+- [ ] Monitoring and alerting configured
+- [ ] User training completed
+- [ ] Documentation reviewed
 
 Congratulations! Your AI Employee system is now ready to automate your business operations.
+
+## Additional Resources
+
+- **API Documentation**: http://localhost:8000/docs
+- **Monitoring Dashboard**: http://localhost:8000/dashboard
+- **Architecture Guide**: `docs/architecture.md`
+- **Troubleshooting Guide**: `docs/troubleshooting.md`
+- **Community Support**: https://github.com/your-org/ai-employee/discussions

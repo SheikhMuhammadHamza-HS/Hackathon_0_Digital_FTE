@@ -26,9 +26,11 @@ class ApprovalWatcher:
 
     def __init__(self, poll_interval: int = 5, stop_event: threading.Event | None = None):
         self.poll_interval = poll_interval
-        self.approved_dir = Path(settings.APPROVED_PATH)
-        self.done_dir = Path(settings.DONE_PATH)
-        self.failed_dir = Path(settings.FAILED_PATH)
+        # Use absolute paths from project root
+        base_dir = Path(settings.BASE_DIR)
+        self.approved_dir = base_dir / settings.APPROVED_PATH
+        self.done_dir = base_dir / settings.DONE_PATH
+        self.failed_dir = base_dir / settings.FAILED_PATH
         self.executor = ActionExecutor()
         self.dashboard = DashboardUpdater()
         # Track processed files to avoid re‑processing.

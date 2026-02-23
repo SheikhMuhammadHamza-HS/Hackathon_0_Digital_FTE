@@ -8,7 +8,7 @@ temporary data, and system maintenance tasks.
 import asyncio
 import logging
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 from dataclasses import dataclass, field
@@ -230,7 +230,7 @@ class CleanupManager:
             logger.error(f"Cleanup rule {rule.name} failed: {e}")
 
         finally:
-            result.end_time = datetime.utcnow()
+            result.end_time = datetime.now(timezone.utc)
             await self._publish_cleanup_result(result)
 
     async def _get_cleanup_paths(self) -> List[Path]:
@@ -275,7 +275,7 @@ class CleanupManager:
             else:
                 files = base_path.glob(rule.path_pattern)
 
-            cutoff_date = datetime.utcnow() - timedelta(days=rule.max_age_days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=rule.max_age_days)
 
             for file_path in files:
                 if not file_path.is_file():
@@ -354,7 +354,7 @@ class CleanupManager:
                     "errors": result.errors,
                     "duration_seconds": (result.end_time - result.start_time).total_seconds() if result.end_time else None
                 },
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
             await self.event_bus.publish(event)
@@ -389,7 +389,7 @@ class CleanupManager:
                     await self._cleanup_path(base_path, rule, result)
 
                 result.status = CleanupStatus.COMPLETED
-                result.end_time = datetime.utcnow()
+                result.end_time = datetime.now(timezone.utc)
                 results.append(result)
 
             finally:

@@ -208,9 +208,9 @@ class AgentCLI:
     def persistence_status(self, args):
         """Show persistence loop status."""
         print("Ralph Wiggum persistence loop status check...")
-        needs_action_path = Path(settings.NEEDS_ACTION_PATH)
-        approved_path = Path(settings.APPROVED_PATH)
-        done_path = Path(settings.DONE_PATH)
+        needs_action_path = Path(settings.BASE_DIR) / settings.NEEDS_ACTION_PATH
+        approved_path = Path(settings.BASE_DIR) / settings.APPROVED_PATH
+        done_path = Path(settings.BASE_DIR) / settings.DONE_PATH
 
         needs_count = len(list(needs_action_path.glob("*.md"))) if needs_action_path.exists() else 0
         approved_count = len(list(approved_path.glob("*.md"))) if approved_path.exists() else 0

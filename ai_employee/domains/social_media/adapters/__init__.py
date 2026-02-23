@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 import asyncio
 import logging
 from aiohttp import web
@@ -219,7 +219,7 @@ class SocialMediaAdapter(ABC):
             return True
 
         limit_info = self.rate_limits[endpoint]
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
 
         # Check if we're within the rate limit window
         if current_time < limit_info.get("reset_time", current_time):
@@ -334,7 +334,7 @@ class RateLimiter:
             Tuple of (allowed, wait_time)
         """
         async with self._lock:
-            now = datetime.utcnow().timestamp()
+            now = datetime.now(timezone.utc).timestamp()
 
             # Remove old calls outside the window
             self.calls = [call_time for call_time in self.calls
@@ -358,7 +358,7 @@ class RateLimiter:
         if not self.calls:
             return 0
 
-        now = datetime.utcnow().timestamp()
+        now = datetime.now(timezone.utc).timestamp()
         oldest_call = min(self.calls)
         wait_time = self.window_seconds - (now - oldest_call)
         return max(0, wait_time)

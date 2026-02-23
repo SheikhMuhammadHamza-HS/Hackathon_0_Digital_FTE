@@ -10,7 +10,7 @@ import logging
 import signal
 import sys
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -684,7 +684,7 @@ class AIEmployeeSystem:
             details: Additional details
         """
         audit_entry = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "action": action,
             "user": user,
             "details": details
@@ -779,7 +779,7 @@ class AIEmployeeSystem:
                 return {
                     "status": "unavailable",
                     "error": "Health monitor not initialized",
-                    "timestamp": datetime.utcnow().isoformat()
+                    "timestamp": datetime.now(timezone.utc).isoformat()
                 }
 
             # Get comprehensive health report
@@ -898,7 +898,7 @@ class AIEmployeeSystem:
             return {
                 "status": "error",
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
     async def get_status(self) -> dict:

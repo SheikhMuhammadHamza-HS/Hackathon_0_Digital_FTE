@@ -7,7 +7,7 @@ and response workflow with HITL approval system.
 
 import pytest
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from unittest.mock import Mock, AsyncMock, patch
 from typing import List, Dict, Any
 
@@ -78,7 +78,7 @@ class TestMentionMonitoringIntegration:
                 platform=Platform.TWITTER,
                 content="Great work @OurCompany! Love the new AI features! 🎉",
                 author="@happy_customer",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 url="https://twitter.com/happy_customer/status/123",
                 mention_type=MentionType.DIRECT,
                 sentiment=Sentiment.POSITIVE,
@@ -89,7 +89,7 @@ class TestMentionMonitoringIntegration:
                 platform=Platform.TWITTER,
                 content="@OurCompany Your customer service is terrible. Worst experience ever.",
                 author="@angry_customer",
-                timestamp=datetime.utcnow() - timedelta(minutes=5),
+                timestamp=datetime.now(timezone.utc) - timedelta(minutes=5),
                 url="https://twitter.com/angry_customer/status/124",
                 mention_type=MentionType.DIRECT,
                 sentiment=Sentiment.NEGATIVE,
@@ -101,7 +101,7 @@ class TestMentionMonitoringIntegration:
                 platform=Platform.LINKEDIN,
                 content="I wonder if @OurCompany's AI can help with our workflow automation needs.",
                 author="LinkedIn User",
-                timestamp=datetime.utcnow() - timedelta(hours=1),
+                timestamp=datetime.now(timezone.utc) - timedelta(hours=1),
                 url="https://linkedin.com/feed/update/125",
                 mention_type=MentionType.QUESTION,
                 sentiment=Sentiment.NEUTRAL,
@@ -122,13 +122,13 @@ class TestMentionMonitoringIntegration:
                 "id": "tweet_123",
                 "text": "Great work @OurCompany! Love the new features!",
                 "user": {"screen_name": "happy_customer"},
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat()
             },
             {
                 "id": "tweet_124",
                 "text": "@OurCompany having issues with your service 😠",
                 "user": {"screen_name": "frustrated_user"},
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat()
             }
         ]
 
@@ -183,7 +183,7 @@ class TestMentionMonitoringIntegration:
             platform=Platform.TWITTER,
             content="@OurCompany Can you explain your pricing model?",
             author="@potential_customer",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             url="https://twitter.com/potential_customer/status/123",
             mention_type=MentionType.QUESTION,
             sentiment=Sentiment.NEUTRAL,
@@ -222,7 +222,7 @@ class TestMentionMonitoringIntegration:
             platform=Platform.TWITTER,
             content="@OurCompany I'm having trouble with my account",
             author="@troubled_user",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             url="https://twitter.com/troubled_user/status/125",
             mention_type=MentionType.SUPPORT_REQUEST,
             sentiment=Sentiment.NEGATIVE,
@@ -291,7 +291,7 @@ class TestMentionMonitoringIntegration:
             platform=Platform.TWITTER,
             content="@OurCompany URGENT: System is down!",
             author="@urgent_user",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             priority=0.95
         )
 
@@ -300,7 +300,7 @@ class TestMentionMonitoringIntegration:
             platform=Platform.TWITTER,
             content="@OurCompany Question about your product",
             author="@curious_user",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             priority=0.6
         )
 
@@ -309,7 +309,7 @@ class TestMentionMonitoringIntegration:
             platform=Platform.TWITTER,
             content="@OurCompany Nice work!",
             author="@compliment_user",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             priority=0.3
         )
 
@@ -344,7 +344,7 @@ class TestMentionMonitoringIntegration:
                 platform=Platform.TWITTER,
                 content=f"@OurCompany Test mention {i}",
                 author=f"@user_{i}",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 sentiment=Sentiment.POSITIVE if i < 3 else Sentiment.NEGATIVE if i < 7 else Sentiment.NEUTRAL
             )
 
@@ -381,7 +381,7 @@ class TestMentionMonitoringIntegration:
                 platform=Platform.TWITTER,
                 content=f"@OurCompany Historical mention {i}",
                 author=f"@user_{i % 5}",  # Repeat users
-                timestamp=datetime.utcnow() - timedelta(days=i // 5),
+                timestamp=datetime.now(timezone.utc) - timedelta(days=i // 5),
                 sentiment=Sentiment.POSITIVE if i % 3 == 0 else Sentiment.NEGATIVE
             )
             historical_mentions.append(mention)
@@ -460,7 +460,7 @@ class TestMentionMonitoringIntegration:
                 platform=Platform.TWITTER,
                 content=f"Test {mention_type.value} mention",
                 author="@test_user",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 mention_type=mention_type
             )
 
@@ -513,7 +513,7 @@ class TestMentionMonitoringIntegration:
             platform=Platform.TWITTER,
             content="@OurCompany Testing event publishing",
             author="@event_tester",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             sentiment=Sentiment.POSITIVE
         )
 
@@ -538,7 +538,7 @@ class TestMentionMonitoringIntegration:
                 platform=Platform.TWITTER,
                 content=f"@OurCompany Concurrent mention {i}",
                 author=f"@user_{i}",
-                timestamp=datetime.utcnow()
+                timestamp=datetime.now(timezone.utc)
             )
             for i in range(10)
         ]

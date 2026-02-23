@@ -5,7 +5,7 @@ Provides REST API endpoints for accessing health status, metrics,
 alerts, and system health information.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Optional
 from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
@@ -254,7 +254,7 @@ async def get_metrics(
     """Get system metrics and their history."""
     try:
         response = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "system_metrics": {},
             "service_metrics": {},
             "history": {}
@@ -293,7 +293,7 @@ async def get_metrics(
             # Get history for all metrics
             for metric_key in monitor._metrics_history:
                 if hours:
-                    cutoff = datetime.utcnow() - timedelta(hours=hours)
+                    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
                     history = [
                         (h["timestamp"], h["value"])
                         for h in monitor._metrics_history[metric_key]
@@ -421,7 +421,7 @@ async def get_uptime(
         uptime_data = {
             "system_start_time": monitor._start_time.isoformat(),
             "system_boot_time": monitor._boot_time.isoformat(),
-            "uptime_hours": (datetime.utcnow() - monitor._start_time).total_seconds() / 3600,
+            "uptime_hours": (datetime.now(timezone.utc) - monitor._start_time).total_seconds() / 3600,
             "checks": {}
         }
 
@@ -516,7 +516,7 @@ async def ping():
 @router.get("/live", response_model=Dict[str, str])
 async def liveness():
     """Kubernetes liveness probe endpoint."""
-    return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "alive", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 # Readiness probe (checks if service is ready to accept traffic)
@@ -539,14 +539,14 @@ async def readiness(
                     issues.append(f"{check_name}: {check.status.value}")
 
         if ready:
-            return {"status": "ready", "timestamp": datetime.utcnow().isoformat()}
+            return {"status": "ready", "timestamp": datetime.now(timezone.utc).isoformat()}
         else:
             return JSONResponse(
                 status_code=503,
                 content={
                     "status": "not_ready",
                     "issues": issues,
-                    "timestamp": datetime.utcnow().isoformat()
+                    "timestamp": datetime.now(timezone.utc).isoformat()
                 }
             )
     except Exception as e:
@@ -556,6 +556,6 @@ async def readiness(
             content={
                 "status": "not_ready",
                 "error": "Health check system unavailable",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
         )

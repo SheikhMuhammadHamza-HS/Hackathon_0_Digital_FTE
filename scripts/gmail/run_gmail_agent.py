@@ -2,11 +2,17 @@ import asyncio
 import logging
 import sys
 import os
+import warnings
 from pathlib import Path
 from datetime import datetime
 
 # Setup path
 sys.path.insert(0, str(Path(__file__).parent))
+
+# Suppress warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
+warnings.filterwarnings("ignore", message=".*file_cache is only supported with oauth2client.*")
+os.environ["GOOGLE_API_USE_CLIENT_CERTIFICATE"] = "false"
 
 from src.watchers.gmail_watcher import GmailWatcher
 from src.watchers.approval_watcher import ApprovalWatcher
@@ -27,8 +33,8 @@ async def main():
 
     # 1. Initialize Gmail Watcher
     try:
-        gmail_watcher = GmailWatcher(poll_interval=30)
-        logger.info("✓ Gmail Watcher initialized")
+        gmail_watcher = GmailWatcher(poll_interval=15)
+        logger.info("[OK] Gmail Watcher initialized")
     except Exception as e:
         logger.error(f"Failed to initialize Gmail Watcher: {e}")
         return
@@ -36,7 +42,7 @@ async def main():
     # 2. Initialize Approval Watcher (to send approved emails)
     try:
         approval_watcher = ApprovalWatcher(poll_interval=10)
-        logger.info("✓ Approval Watcher initialized")
+        logger.info("[OK] Approval Watcher initialized")
     except Exception as e:
         logger.error(f"Failed to initialize Approval Watcher: {e}")
         return
@@ -57,12 +63,19 @@ async def main():
         logger.info("[SENDER] Checking for approved drafts...")
         # ApprovalWatcher.start is blocking, so we'll run its core logic manually here
         # to keep it in a single loop for this test agent.
-        for path in Path(settings.APPROVED_PATH).iterdir():
+        # Use absolute path from project root
+        approved_path = Path(settings.BASE_DIR) / settings.APPROVED_PATH
+        approved_path.mkdir(parents=True, exist_ok=True)
+        logger.info(f"[SENDER] Looking in: {approved_path}")
+        files = list(approved_path.glob("*.md"))
+        logger.info(f"[SENDER] Found {len(files)} approved files")
+        for path in files:
             if path.is_file() and path.suffix == ".md":
                 logger.info(f"[SENDER] Found approved file: {path.name}")
                 approval_watcher._process_file(path)
 
-        await asyncio.sleep(30)
+        logger.info(f"[INFO] Waiting 15 seconds for next cycle...")
+        await asyncio.sleep(15)
 
 if __name__ == "__main__":
     try:

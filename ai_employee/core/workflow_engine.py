@@ -12,7 +12,7 @@ from typing import (
     get_type_hints
 )
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 import json
 import uuid
@@ -62,7 +62,7 @@ class WorkflowContext:
             value: Value to set
         """
         self.data[key] = value
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get a value from context.
@@ -94,7 +94,7 @@ class WorkflowContext:
             updates: Dictionary of updates
         """
         self.data.update(updates)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
 
 @dataclass
@@ -250,7 +250,7 @@ class Workflow:
         self.status = WorkflowStatus.PENDING
         self.current_step_index = -1
         self.step_results: List[StepResult] = []
-        self.created_at = datetime.utcnow()
+        self.created_at = datetime.now(timezone.utc)
         self.started_at: Optional[datetime] = None
         self.completed_at: Optional[datetime] = None
         self.error: Optional[str] = None
@@ -290,7 +290,7 @@ class Workflow:
             return False
 
         self.status = WorkflowStatus.RUNNING
-        self.started_at = datetime.utcnow()
+        self.started_at = datetime.now(timezone.utc)
 
         logger.info(f"Starting workflow {self.workflow_id}: {self.name}")
 
@@ -325,7 +325,7 @@ class Workflow:
 
             # All steps completed successfully
             self.status = WorkflowStatus.COMPLETED
-            self.completed_at = datetime.utcnow()
+            self.completed_at = datetime.now(timezone.utc)
 
             logger.info(f"Workflow {self.workflow_id} completed successfully")
             return True
@@ -347,7 +347,7 @@ class Workflow:
         """
         logger.info(f"Executing step {step.step_id}: {step.name}")
 
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
 
         try:
             # Execute step with timeout and retries
@@ -356,7 +356,7 @@ class Workflow:
                 timeout=step.timeout_seconds
             )
 
-            duration = (datetime.utcnow() - start_time).total_seconds()
+            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
             result.execution_time = duration
 
             if result.status == StepStatus.COMPLETED:
@@ -367,7 +367,7 @@ class Workflow:
             return result
 
         except asyncio.TimeoutError:
-            duration = (datetime.utcnow() - start_time).total_seconds()
+            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
             error_msg = f"Step {step.step_id} timed out after {step.timeout_seconds}s"
             logger.error(error_msg)
 
@@ -379,7 +379,7 @@ class Workflow:
             )
 
         except Exception as e:
-            duration = (datetime.utcnow() - start_time).total_seconds()
+            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
             error_msg = f"Unexpected error in step {step.step_id}: {e}"
             logger.error(error_msg, exc_info=True)
 
@@ -442,7 +442,7 @@ class Workflow:
         """
         self.error = error
         self.status = WorkflowStatus.FAILED
-        self.completed_at = datetime.utcnow()
+        self.completed_at = datetime.now(timezone.utc)
 
         # Attempt rollback of completed steps
         await self.rollback()
@@ -493,7 +493,7 @@ class Workflow:
 
         if not approved:
             self.status = WorkflowStatus.CANCELLED
-            self.completed_at = datetime.utcnow()
+            self.completed_at = datetime.now(timezone.utc)
             self.error = f"Approval denied: {notes}"
             logger.info(f"Workflow {self.workflow_id} cancelled due to approval denial")
             return False
@@ -536,7 +536,7 @@ class Workflow:
 
             # All steps completed successfully
             self.status = WorkflowStatus.COMPLETED
-            self.completed_at = datetime.utcnow()
+            self.completed_at = datetime.now(timezone.utc)
 
             logger.info(f"Workflow {self.workflow_id} completed successfully")
             return True
@@ -680,7 +680,7 @@ class WorkflowEngine:
             return False
 
         workflow.status = WorkflowStatus.CANCELLED
-        workflow.completed_at = datetime.utcnow()
+        workflow.completed_at = datetime.now(timezone.utc)
 
         logger.info(f"Cancelled workflow {workflow_id}")
         return True
@@ -710,7 +710,7 @@ class WorkflowEngine:
         Returns:
             Number of workflows removed
         """
-        cutoff_time = datetime.utcnow() - timedelta(hours=older_than_hours)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=older_than_hours)
         to_remove = []
 
         for workflow_id, workflow in self.workflows.items():
