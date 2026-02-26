@@ -217,7 +217,7 @@ class InvoiceService(DomainService):
             "partner_id": invoice.client_id,
             "move_type": "out_invoice",
             "invoice_date": invoice.issue_date.isoformat(),
-            "date_due": invoice.due_date.isoformat(),
+            "invoice_date_due": invoice.due_date.isoformat(),
             "invoice_line_ids": [],
             "state": "draft"
         }
@@ -226,10 +226,10 @@ class InvoiceService(DomainService):
         for item in invoice.line_items:
             line_data = {
                 "name": item.description,
-                "quantity": item.quantity,
+                "quantity": float(item.quantity),
                 "price_unit": float(item.unit_price.amount),
                 "tax_ids": [],
-                "account_id": 400000  # Default sales account
+                "account_id": 24  # Corrected for Odoo 17 (Product Sales)
             }
             odoo_data["invoice_line_ids"].append((0, 0, line_data))
 

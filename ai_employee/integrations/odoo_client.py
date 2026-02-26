@@ -117,11 +117,19 @@ class OdooClient:
                     raise OdooAuthenticationError("Invalid authentication response")
 
                 session_info = result["result"]
-                self.session_id = session_info.get("session_id")
+                # Odoo 17 often returns session_id in cookies but sometimes also in result
+                self.session_id = session_info.get("session_id") or response.cookies.get("session_id")
+                if self.session_id and hasattr(self.session_id, 'value'):
+                    self.session_id = self.session_id.value
+                
+                # If still not found, use a fallback if UID exists (session handled by aiohttp)
+                if not self.session_id and session_info.get("uid"):
+                    self.session_id = "ai_session"
+                    
                 self.user_id = session_info.get("uid")
                 self.company_id = session_info.get("company_id")
 
-                if not self.session_id or not self.user_id:
+                if not self.user_id:
                     raise OdooAuthenticationError("Invalid session info")
 
             logger.info(f"Authenticated with Odoo as user {self.user_id}")
@@ -447,7 +455,8 @@ class OdooClient:
         # Add session ID to context
         if "context" not in kwargs:
             kwargs["context"] = {}
-        kwargs["context"]["session_id"] = self.session_id
+        if self.session_id:
+            kwargs["context"]["session_id"] = self.session_id
 
         try:
             async with self._session.post(rpc_url, json=rpc_data) as response:
@@ -472,14 +481,14 @@ class OdooClient:
             True if connection is successful
         """
         try:
-            # Try to get version info
-            version_info = await self._call_kw(
-                "ir.module.module",
-                "search_read",
-                [[["name", "=", "base"], ["state", "=", "installed"]]]
+            # Test with a simple read operation
+            result = await self._call_kw(
+                "res.users",
+                "search",
+                [[["id", "=", 1]]]
             )
 
-            return bool(version_info)
+            return len(result) > 0
 
         except Exception as e:
             logger.error(f"Odoo connection test failed: {e}")
