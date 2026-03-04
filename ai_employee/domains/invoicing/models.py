@@ -158,8 +158,7 @@ class Invoice(BaseEntity):
     amount_paid: Money = field(default_factory=lambda: Money(Decimal('0')))
     balance_due: Money = field(default_factory=lambda: Money(Decimal('0')))
 
-    # External references
-    odoo_invoice_id: Optional[str] = None
+    skill_invoice_id: Optional[str] = None
     approval_request_id: Optional[str] = None
     sent_at: Optional[datetime] = None
 
@@ -329,7 +328,7 @@ class Invoice(BaseEntity):
             'total_amount': float(self.total_amount.amount),
             'amount_paid': float(self.amount_paid.amount),
             'balance_due': float(self.balance_due.amount),
-            'odoo_invoice_id': self.odoo_invoice_id,
+            'skill_invoice_id': self.skill_invoice_id,
             'approval_request_id': self.approval_request_id,
             'sent_at': self.sent_at.isoformat() if self.sent_at else None,
             'is_overdue': self.is_overdue(),
@@ -383,7 +382,7 @@ class Invoice(BaseEntity):
             total_amount=total_amount,
             amount_paid=amount_paid,
             balance_due=balance_due,
-            odoo_invoice_id=data.get('odoo_invoice_id'),
+            skill_invoice_id=data.get('skill_invoice_id'),
             approval_request_id=data.get('approval_request_id'),
             sent_at=sent_at
         )
@@ -404,8 +403,7 @@ class Client(BaseEntity):
     payment_terms: str = "Net 30"
     currency: str = "USD"
     is_active: bool = True
-    odoo_partner_id: Optional[str] = None
-
+    
     def __post_init__(self):
         """Validate client data."""
         if not self.name:
@@ -474,6 +472,5 @@ class Client(BaseEntity):
             tax_id=data.get('tax_id'),
             payment_terms=data.get('payment_terms', 'Net 30'),
             currency=data.get('currency', 'USD'),
-            is_active=data.get('is_active', True),
-            odoo_partner_id=data.get('odoo_partner_id')
+            is_active=data.get('is_active', True)
         )

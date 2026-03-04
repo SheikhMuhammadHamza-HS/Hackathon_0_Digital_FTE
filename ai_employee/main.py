@@ -10,9 +10,10 @@ import logging
 import signal
 import sys
 import json
+import click
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from ai_employee.core.config import get_config, reload_config
 from ai_employee.core.environment import validate_environment, EnvironmentValidationError
@@ -25,10 +26,9 @@ from ai_employee.utils.health_monitor import get_health_monitor, initialize_heal
 from ai_employee.utils.error_recovery import ErrorRecoveryService
 from ai_employee.utils.process_watchdog import ProcessWatchdog
 from ai_employee.utils.cleanup_manager import get_cleanup_manager, initialize_cleanup_manager
-from ai_employee.core.circuit_breaker import CircuitBreaker
+from ai_employee.core.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 from ai_employee.domains.invoicing.services import InvoiceService
 from ai_employee.domains.payments.services import PaymentService
-from ai_employee.integrations.odoo_client import get_odoo_client
 from ai_employee.integrations.email_service import get_email_service
 
 logger = logging.getLogger(__name__)
@@ -132,11 +132,14 @@ class AIEmployeeSystem:
 
         # Initialize error recovery with circuit breaker
         logger.info("Initializing error recovery system...")
-        circuit_breaker = CircuitBreaker(
-            name="main_circuit_breaker",
+        config = CircuitBreakerConfig(
             failure_threshold=5,
             recovery_timeout=60,
             expected_exception=Exception
+        )
+        circuit_breaker = CircuitBreaker(
+            name="main_circuit_breaker",
+            config=config
         )
         self.error_recovery = ErrorRecoveryService(
             circuit_breaker=circuit_breaker,
@@ -251,7 +254,6 @@ class AIEmployeeSystem:
         """
         try:
             invoice_service = InvoiceService(
-                odoo_client=get_odoo_client(),
                 email_service=get_email_service(),
                 approval_system=self.approval_system
             )
@@ -326,7 +328,6 @@ class AIEmployeeSystem:
         """
         try:
             invoice_service = InvoiceService(
-                odoo_client=get_odoo_client(),
                 email_service=get_email_service(),
                 approval_system=self.approval_system
             )
@@ -705,13 +706,7 @@ class AIEmployeeSystem:
         logger.error(f"ERROR RECOVERY: {error} - Context: {context}")
 
         # Categorize error and take appropriate action
-        if "odoo" in error.lower():
-            return {
-                "action": "queue_operation",
-                "retry_after": 300,  # 5 minutes
-                "max_retries": 3
-            }
-        elif "email" in error.lower():
+        if "email" in error.lower():
             return {
                 "action": "queue_email",
                 "retry_after": 60,   # 1 minute

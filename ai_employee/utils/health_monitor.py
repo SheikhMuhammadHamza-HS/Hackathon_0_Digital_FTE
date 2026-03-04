@@ -70,7 +70,7 @@ class HealthMetric:
     unit: str = field(default_factory="")
     threshold_warning: Optional[float] = field(default_factory=lambda: None)
     threshold_critical: Optional[float] = field(default_factory=lambda: None)
-    status: HealthStatus = field(default_factory=HealthStatus.HEALTHY)
+    status: HealthStatus = HealthStatus.HEALTHY
     timestamp: datetime = field(default_factory=datetime.utcnow)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -145,18 +145,18 @@ class HealthAlert:
     acknowledged: bool = field(default_factory=False)
     acknowledged_by: Optional[str] = field(default_factory=lambda: None)
     acknowledged_at: Optional[datetime] = field(default_factory=lambda: None)
-    resolved: bool = field(default_factory=False)
+    resolved: bool = field(default_factory=bool)
     resolved_at: Optional[datetime] = field(default_factory=lambda: None)
 
 
 @dataclass
 class HealthEvent(Event):
     """Event published for health status changes."""
-    check_name: str = field(default_factory="")
-    old_status: HealthStatus = field(default_factory=HealthStatus.UNKNOWN)
-    new_status: HealthStatus = field(default_factory=HealthStatus.UNKNOWN)
+    check_name: str = field(default_factory=str)
+    old_status: HealthStatus = HealthStatus.UNKNOWN
+    new_status: HealthStatus = HealthStatus.UNKNOWN
     metrics: Dict[str, float] = field(default_factory=dict)
-    alerts: List[str] = field(default_factory=dict)
+    alerts: List[str] = field(default_factory=list)
 
 
 class HealthMonitor:

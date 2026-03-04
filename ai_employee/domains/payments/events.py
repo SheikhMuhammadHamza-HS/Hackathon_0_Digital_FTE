@@ -128,12 +128,7 @@ class PaymentEventHandler(EventHandler):
             invoice: Invoice to mark
         """
         try:
-            # Update invoice status in Odoo
-            if self.payment_service.odoo_client and invoice.odoo_invoice_id:
-                # Mark invoice as paid in Odoo
-                # This would be a specific Odoo API call
-                pass
-
+            
             # Update local invoice status
             invoice.status = InvoiceStatus.PAID
 

@@ -166,8 +166,9 @@ class CircuitBreaker:
                 self._handle_success()
             else:
                 self._handle_failure(result.exception)
+                raise result.exception
 
-        return result.result if result.success else result.exception
+        return result.result
 
     async def _execute_with_retry(self, func: Callable, *args, **kwargs) -> CallResult:
         """Execute function with retry logic.

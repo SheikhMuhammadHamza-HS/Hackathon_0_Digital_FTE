@@ -27,7 +27,6 @@ from ..utils.logging_config import get_logger
 from ..utils.file_monitor import get_file_monitor
 from ..utils.approval_system import get_approval_system
 from ..utils.health_monitor import get_health_monitor, HealthStatus, HealthEvent
-from ..integrations.odoo_client import OdooAuthenticationError
 
 logger = get_logger(__name__)
 
@@ -226,7 +225,7 @@ class ErrorRecoveryService:
         self._cleanup_task = asyncio.create_task(self._cleanup_worker())
 
         # Subscribe to event bus for error events
-        await self.event_bus.subscribe(ErrorEvent, self._handle_error_event)
+        self.event_bus.subscribe(ErrorEvent, self._handle_error_event)
 
         # Register error recovery health checks
         await self._register_health_checks()

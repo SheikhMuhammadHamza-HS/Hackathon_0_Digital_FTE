@@ -156,6 +156,7 @@ class EnvironmentManager:
             example="user@example.com"
         ))
 
+        
         # Odoo settings
         self.add_rule(ValidationRule(
             name="ODOO_URL",
@@ -273,7 +274,7 @@ class EnvironmentManager:
         """
         try:
             from dotenv import load_dotenv
-            load_dotenv(env_file)
+            load_dotenv(env_file, override=True)
             logger.debug(f"Loaded environment variables from {env_file}")
         except ImportError:
             logger.warning("python-dotenv not installed, skipping .env file loading")
