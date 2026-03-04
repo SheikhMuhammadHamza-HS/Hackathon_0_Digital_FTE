@@ -1,6 +1,7 @@
 """Facebook platform adapter."""
 
 import asyncio
+import httpx
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from .base_adapter import SocialMediaAdapter
@@ -11,14 +12,14 @@ logger = logging.getLogger(__name__)
 
 
 class FacebookAdapter(SocialMediaAdapter):
-    """Facebook platform adapter implementation."""
+    """Facebook platform adapter implementation using Meta Graph API."""
 
     def __init__(self):
         """Initialize Facebook adapter."""
         super().__init__(Platform.FACEBOOK)
         self._access_token = None
         self._page_id = None
-        self._client = None
+        self._base_url = "https://graph.facebook.com/v21.0"
 
     async def authenticate(self, credentials: Dict[str, str]) -> bool:
         """Authenticate with Facebook API."""
@@ -27,60 +28,77 @@ class FacebookAdapter(SocialMediaAdapter):
             self._page_id = credentials.get('page_id')
 
             if not all([self._access_token, self._page_id]):
-                logger.error("Missing required Facebook credentials")
+                logger.error("Missing required Facebook credentials (access_token or page_id)")
                 return False
 
-            # In a real implementation, would initialize Facebook API client here
-            logger.info("Facebook adapter authenticated successfully")
-            return True
+            # Verify token by fetching page info
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self._base_url}/{self._page_id}",
+                    params={"access_token": self._access_token}
+                )
+                if response.status_code == 200:
+                    logger.info("Facebook adapter authenticated successfully")
+                    return True
+                else:
+                    logger.error(f"Facebook authentication failed: {response.text}")
+                    return False
 
         except Exception as e:
             logger.error(f"Facebook authentication failed: {e}")
             return False
 
     async def post_content(self, post: SocialPost) -> str:
-        """Post content to Facebook."""
+        """Post content to Facebook Page feed."""
         try:
-            # Validate content
             if not self.supports_content_type(post.content_type):
                 raise ValueError(f"Unsupported content type: {post.content_type}")
 
-            # Facebook has a much higher character limit, but we'll add reasonable validation
-            if len(post.content) > 5000:
-                raise ValueError("Facebook post exceeds 5000 character limit")
+            async with httpx.AsyncClient() as client:
+                if post.content_type == "image":
+                    media_url = getattr(post, 'media_url', None)
+                    if not media_url:
+                        endpoint = f"{self._base_url}/{self._page_id}/feed"
+                        data = {"message": post.content, "access_token": self._access_token}
+                    else:
+                        endpoint = f"{self._base_url}/{self._page_id}/photos"
+                        data = {"url": media_url, "caption": post.content, "access_token": self._access_token}
+                else:
+                    endpoint = f"{self._base_url}/{self._page_id}/feed"
+                    data = {"message": post.content, "access_token": self._access_token}
 
-            # In real implementation, would call Facebook API
-            logger.info(f"Posting to Facebook: {post.content[:50]}...")
+                response = await client.post(endpoint, data=data)
+                response_data = response.json()
 
-            # Simulate API call
-            await asyncio.sleep(0.1)
-
-            # Return mock post ID
-            post_id = f"facebook_{hash(post.content) % 1000000}"
-            logger.info(f"Posted to Facebook with ID: {post_id}")
-            return post_id
+                if response.status_code in [200, 201]:
+                    post_id = response_data.get("id") or response_data.get("post_id")
+                    logger.info(f"Posted to Facebook with ID: {post_id}")
+                    return str(post_id)
+                else:
+                    logger.error(f"Failed to post to Facebook: {response.text}")
+                    raise Exception(f"Facebook API error: {response_data.get('error', {}).get('message', response.text)}")
 
         except Exception as e:
-            logger.error(f"Failed to post to Facebook: {e}")
+            logger.error(f"Error posting to Facebook: {e}")
             raise
 
     async def get_post(self, post_id: str) -> Optional[SocialPost]:
         """Retrieve a Facebook post by ID."""
         try:
-            logger.info(f"Retrieving Facebook post: {post_id}")
-
-            # In real implementation, would call Facebook API
-            await asyncio.sleep(0.1)
-
-            # Return mock post
-            return SocialPost(
-                platform=Platform.FACEBOOK,
-                content="Sample Facebook post content",
-                content_type="text",
-                scheduled_time=None,
-                external_id=post_id
-            )
-
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self._base_url}/{post_id}",
+                    params={"fields": "message,created_time,status_type", "access_token": self._access_token}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    return SocialPost(
+                        platform=Platform.FACEBOOK,
+                        content=data.get("message", ""),
+                        content_type="text",
+                        external_id=post_id
+                    )
+            return None
         except Exception as e:
             logger.error(f"Failed to retrieve Facebook post: {e}")
             return None
@@ -88,14 +106,12 @@ class FacebookAdapter(SocialMediaAdapter):
     async def delete_post(self, post_id: str) -> bool:
         """Delete a Facebook post by ID."""
         try:
-            logger.info(f"Deleting Facebook post: {post_id}")
-
-            # In real implementation, would call Facebook API
-            await asyncio.sleep(0.1)
-
-            logger.info(f"Deleted Facebook post: {post_id}")
-            return True
-
+            async with httpx.AsyncClient() as client:
+                response = await client.delete(
+                    f"{self._base_url}/{post_id}",
+                    params={"access_token": self._access_token}
+                )
+                return response.status_code == 200
         except Exception as e:
             logger.error(f"Failed to delete Facebook post: {e}")
             return False
@@ -103,31 +119,23 @@ class FacebookAdapter(SocialMediaAdapter):
     async def get_mentions(self, since: Optional[datetime] = None) -> List[BrandMention]:
         """Get brand mentions from Facebook."""
         try:
-            logger.info("Fetching Facebook mentions")
-
-            # In real implementation, would call Facebook API to get mentions/comments
-            await asyncio.sleep(0.1)
-
-            # Return mock mentions
-            mentions = [
-                BrandMention(
-                    platform=Platform.FACEBOOK,
-                    content="Love what you're doing with the brand!",
-                    author="User Name",
-                    timestamp=datetime.now(),
-                    engagement_score=4.0
-                ),
-                BrandMention(
-                    platform=Platform.FACEBOOK,
-                    content="Can you help me with my order?",
-                    author="Another User",
-                    timestamp=datetime.now(),
-                    engagement_score=2.5
+            mentions = []
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self._base_url}/{self._page_id}/tagged",
+                    params={"access_token": self._access_token}
                 )
-            ]
-
+                if response.status_code == 200:
+                    data = response.json().get("data", [])
+                    for item in data:
+                        mentions.append(BrandMention(
+                            platform=Platform.FACEBOOK,
+                            content=item.get("message", ""),
+                            author=item.get("from", {}).get("name", "Unknown"),
+                            timestamp=datetime.now(),
+                            engagement_score=1.0
+                        ))
             return mentions
-
         except Exception as e:
             logger.error(f"Failed to fetch Facebook mentions: {e}")
             return []
@@ -135,54 +143,58 @@ class FacebookAdapter(SocialMediaAdapter):
     async def get_engagement_stats(self, post_id: str) -> Dict[str, Any]:
         """Get engagement statistics for a Facebook post."""
         try:
-            logger.info(f"Getting engagement stats for Facebook post: {post_id}")
-
-            # In real implementation, would call Facebook API
-            await asyncio.sleep(0.1)
-
-            # Return mock statistics
-            return {
-                'likes': 87,
-                'comments': 23,
-                'shares': 12,
-                'reach': 3200,
-                'engagement_rate': 0.038
-            }
-
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self._base_url}/{post_id}",
+                    params={
+                        "fields": "reactions.summary(true),comments.summary(true),shares",
+                        "access_token": self._access_token
+                    }
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        'likes': data.get('reactions', {}).get('summary', {}).get('total_count', 0),
+                        'comments': data.get('comments', {}).get('summary', {}).get('total_count', 0),
+                        'shares': data.get('shares', {}).get('count', 0)
+                    }
+            return {}
         except Exception as e:
             logger.error(f"Failed to get Facebook engagement stats: {e}")
             return {}
 
     def supports_content_type(self, content_type: str) -> bool:
         """Check if Facebook supports the content type."""
-        supported_types = ['text', 'image', 'video', 'link', 'album']
+        supported_types = ['text', 'image', 'video', 'link']
         return content_type in supported_types
 
 
 class InstagramAdapter(SocialMediaAdapter):
-    """Instagram platform adapter implementation (owned by Facebook/Meta)."""
+    """Instagram platform adapter implementation using Meta Graph API."""
 
     def __init__(self):
         """Initialize Instagram adapter."""
         super().__init__(Platform.INSTAGRAM)
         self._access_token = None
-        self._instagram_account_id = None
-        self._client = None
-        self._facebook_adapter = None  # Reuse Facebook authentication
+        self._ig_user_id = None
+        self._base_url = "https://graph.facebook.com/v21.0"
 
     async def authenticate(self, credentials: Dict[str, str]) -> bool:
-        """Authenticate with Instagram API (via Facebook)."""
+        """Authenticate with Instagram API."""
         try:
-            self._facebook_adapter = FacebookAdapter()
-            success = await self._facebook_adapter.authenticate(credentials)
+            self._access_token = credentials.get('access_token')
+            self._ig_user_id = credentials.get('instagram_user_id')
 
-            if success:
-                self._instagram_account_id = credentials.get('instagram_account_id')
-                self._access_token = credentials.get('access_token')
-                logger.info("Instagram adapter authenticated successfully")
-                return True
-            else:
+            if not all([self._access_token, self._ig_user_id]):
+                logger.error("Missing required Instagram credentials")
                 return False
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self._base_url}/{self._ig_user_id}",
+                    params={"fields": "username", "access_token": self._access_token}
+                )
+                return response.status_code == 200
 
         except Exception as e:
             logger.error(f"Instagram authentication failed: {e}")
@@ -191,120 +203,97 @@ class InstagramAdapter(SocialMediaAdapter):
     async def post_content(self, post: SocialPost) -> str:
         """Post content to Instagram."""
         try:
-            # Validate content
             if not self.supports_content_type(post.content_type):
-                raise ValueError(f"Unsupported content type for Instagram: {post.content_type}")
+                raise ValueError(f"Instagram requires visual content (image/video)")
 
-            # Instagram has specific requirements
-            if post.content_type == 'text':
-                raise ValueError("Instagram requires visual content (image/video)")
+            media_url = getattr(post, 'media_url', None)
+            if not media_url:
+                raise ValueError("Instagram posting requires a media_url")
 
-            # In real implementation, would call Instagram API
-            logger.info(f"Posting to Instagram: {post.content_type} content")
+            async with httpx.AsyncClient() as client:
+                # 1. Create Media Container
+                container_response = await client.post(
+                    f"{self._base_url}/{self._ig_user_id}/media",
+                    data={
+                        "image_url": media_url if post.content_type == "image" else None,
+                        "video_url": media_url if post.content_type == "video" else None,
+                        "caption": post.content,
+                        "access_token": self._access_token
+                    }
+                )
+                container_id = container_response.json().get("id")
 
-            # Simulate API call
-            await asyncio.sleep(0.1)
+                if not container_id:
+                    raise Exception(f"Failed to create Instagram media container: {container_response.text}")
 
-            # Return mock post ID
-            post_id = f"instagram_{hash(post.content) % 1000000}"
-            logger.info(f"Posted to Instagram with ID: {post_id}")
-            return post_id
+                # 2. Publish Media
+                publish_response = await client.post(
+                    f"{self._base_url}/{self._ig_user_id}/media_publish",
+                    data={
+                        "creation_id": container_id,
+                        "access_token": self._access_token
+                    }
+                )
+                post_id = publish_response.json().get("id")
+
+                if post_id:
+                    logger.info(f"Posted to Instagram with ID: {post_id}")
+                    return str(post_id)
+                else:
+                    raise Exception(f"Failed to publish Instagram media: {publish_response.text}")
 
         except Exception as e:
-            logger.error(f"Failed to post to Instagram: {e}")
+            logger.error(f"Error posting to Instagram: {e}")
             raise
 
     async def get_post(self, post_id: str) -> Optional[SocialPost]:
         """Retrieve an Instagram post by ID."""
         try:
-            logger.info(f"Retrieving Instagram post: {post_id}")
-
-            # In real implementation, would call Instagram API
-            await asyncio.sleep(0.1)
-
-            # Return mock post
-            return SocialPost(
-                platform=Platform.INSTAGRAM,
-                content="Instagram post content",
-                content_type="image",
-                scheduled_time=None,
-                external_id=post_id
-            )
-
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self._base_url}/{post_id}",
+                    params={"fields": "caption,media_type,timestamp", "access_token": self._access_token}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    return SocialPost(
+                        platform=Platform.INSTAGRAM,
+                        content=data.get("caption", ""),
+                        content_type="image",
+                        external_id=post_id
+                    )
+            return None
         except Exception as e:
             logger.error(f"Failed to retrieve Instagram post: {e}")
             return None
 
     async def delete_post(self, post_id: str) -> bool:
-        """Delete an Instagram post by ID."""
-        try:
-            logger.info(f"Deleting Instagram post: {post_id}")
-
-            # In real implementation, would call Instagram API
-            await asyncio.sleep(0.1)
-
-            logger.info(f"Deleted Instagram post: {post_id}")
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to delete Instagram post: {e}")
-            return False
+        """Delete an Instagram post."""
+        return False
 
     async def get_mentions(self, since: Optional[datetime] = None) -> List[BrandMention]:
-        """Get brand mentions from Instagram."""
-        try:
-            logger.info("Fetching Instagram mentions")
-
-            # In real implementation, would call Instagram API
-            await asyncio.sleep(0.1)
-
-            # Return mock mentions
-            mentions = [
-                BrandMention(
-                    platform=Platform.INSTAGRAM,
-                    content="Amazing visuals! #brand",
-                    author="@insta_user1",
-                    timestamp=datetime.now(),
-                    engagement_score=4.5
-                ),
-                BrandMention(
-                    platform=Platform.INSTAGRAM,
-                    content="Loving this aesthetic",
-                    author="@insta_user2",
-                    timestamp=datetime.now(),
-                    engagement_score=3.8
-                )
-            ]
-
-            return mentions
-
-        except Exception as e:
-            logger.error(f"Failed to fetch Instagram mentions: {e}")
-            return []
+        """Get Instagram mentions."""
+        return []
 
     async def get_engagement_stats(self, post_id: str) -> Dict[str, Any]:
         """Get engagement statistics for an Instagram post."""
         try:
-            logger.info(f"Getting engagement stats for Instagram post: {post_id}")
-
-            # In real implementation, would call Instagram API
-            await asyncio.sleep(0.1)
-
-            # Return mock statistics
-            return {
-                'likes': 156,
-                'comments': 34,
-                'saves': 28,
-                'reach': 4500,
-                'engagement_rate': 0.049
-            }
-
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self._base_url}/{post_id}",
+                    params={"fields": "like_count,comments_count", "access_token": self._access_token}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        'likes': data.get('like_count', 0),
+                        'comments': data.get('comments_count', 0)
+                    }
+            return {}
         except Exception as e:
             logger.error(f"Failed to get Instagram engagement stats: {e}")
             return {}
 
     def supports_content_type(self, content_type: str) -> bool:
         """Check if Instagram supports the content type."""
-        # Instagram is primarily visual
-        supported_types = ['image', 'video', 'story', 'reel']
-        return content_type in supported_types
+        return content_type in ['image', 'video']
