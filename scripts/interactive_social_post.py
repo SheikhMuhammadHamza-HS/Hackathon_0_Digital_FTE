@@ -94,11 +94,17 @@ async def interactive_post():
 
             # Post
             post_id = await adapter.post_content(post)
+            
+            # Stop progress before showing success
+            progress.stop()
+            
             console.print(f"\n[bold green]🎉 SUCCESS![/bold green] Your post is live on {platform_choice}!")
             console.print(f"[cyan]Post ID:[/cyan] {post_id}")
             
             if selected_platform == Platform.FACEBOOK:
-                console.print(f"[link=https://www.facebook.com/{post_id}]🔗 Click here to view your post[/link]")
+                # Facebook post IDs can be composite (PageID_PostID) - we try to make a clickable link
+                display_id = post_id
+                console.print(f"[link=https://www.facebook.com/{display_id}]🔗 Click here to view your post[/link]")
 
         except Exception as e:
             console.print(f"\n[bold red]❌ FULL ERROR DETAILS:[/bold red]\n{str(e)}")
