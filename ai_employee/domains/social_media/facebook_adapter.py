@@ -57,8 +57,6 @@ class FacebookAdapter(SocialMediaAdapter):
             async with httpx.AsyncClient() as client:
                 if post.content_type == "image":
                     # Handle image posting
-                    # Note: Usually requires a publicly accessible URL or multipart upload
-                    # This implementation assumes post.media_url is provided
                     media_url = getattr(post, 'media_url', None)
                     if not media_url:
                         # Fallback to text post if no image URL
@@ -81,7 +79,8 @@ class FacebookAdapter(SocialMediaAdapter):
                     return str(post_id)
                 else:
                     logger.error(f"Failed to post to Facebook: {response.text}")
-                    raise Exception(f"Facebook API error: {response.text}")
+                    error_msg = response_data.get('error', {}).get('message', response.text)
+                    raise Exception(f"Facebook API error: {error_msg}")
 
         except Exception as e:
             logger.error(f"Error posting to Facebook: {e}")
@@ -126,7 +125,7 @@ class FacebookAdapter(SocialMediaAdapter):
         try:
             mentions = []
             async with httpx.AsyncClient() as client:
-                # Get activity/comments
+                # Get activity/comments where the page is tagged
                 response = await client.get(
                     f"{self._base_url}/{self._page_id}/tagged",
                     params={"access_token": self._access_token}
@@ -138,7 +137,7 @@ class FacebookAdapter(SocialMediaAdapter):
                             platform=Platform.FACEBOOK,
                             content=item.get("message", ""),
                             author=item.get("from", {}).get("name", "Unknown"),
-                            timestamp=datetime.now(), # Simplified
+                            timestamp=datetime.now(),
                             engagement_score=1.0
                         ))
             return mentions
@@ -186,7 +185,7 @@ class InstagramAdapter(SocialMediaAdapter):
         self._base_url = "https://graph.facebook.com/v21.0"
 
     async def authenticate(self, credentials: Dict[str, str]) -> bool:
-        """Authenticate with Instagram API (via Facebook)."""
+        """Authenticate with Instagram API."""
         try:
             self._access_token = credentials.get('access_token')
             self._ig_user_id = credentials.get('instagram_user_id')
