@@ -33,15 +33,15 @@ class CleanupStatus(Enum):
 @dataclass
 class CleanupRule:
     """Cleanup rule configuration."""
-    name: str = field(default_factory="")
-    path_pattern: str = field(default_factory="")  # Glob pattern for files to clean
-    max_age_days: int = field(default_factory=30)
-    min_size_mb: Optional[int] = field(default_factory=lambda: None)
-    max_size_mb: Optional[int] = field(default_factory=lambda: None)
-    recursive: bool = field(default_factory=True)
-    dry_run: bool = field(default_factory=False)
+    name: str = ""
+    path_pattern: str = ""  # Glob pattern for files to clean
+    max_age_days: int = 30
+    min_size_mb: Optional[int] = None
+    max_size_mb: Optional[int] = None
+    recursive: bool = True
+    dry_run: bool = False
+    schedule_hours: int = 24  # How often to run this cleanup
     exclude_patterns: List[str] = field(default_factory=list)
-    schedule_hours: int = field(default_factory=24)  # How often to run this cleanup
 
 
 @dataclass

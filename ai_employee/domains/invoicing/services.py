@@ -18,6 +18,7 @@ from ...core.event_bus import get_event_bus, Event
 from ...core.workflow_engine import get_workflow_engine, Workflow, WorkflowStep
 from ...utils.approval_system import get_approval_system
 from ...utils.logging_config import business_logger
+from ...integrations.odoo_skill_client import get_odoo_skill_client
 
 logger = logging.getLogger(__name__)
 
@@ -42,18 +43,17 @@ class InvoicePostedEvent(Event):
 class InvoiceService(DomainService):
     """Service for managing invoices."""
 
-    def __init__(self, odoo_client=None, email_service=None, approval_system=None):
+    def __init__(self, email_service=None, approval_system=None):
         """Initialize invoice service.
 
         Args:
-            odoo_client: Odoo ERP client
             email_service: Email service client
             approval_system: Approval system
-        """
+"""
         super().__init__("invoice_service")
-        self.odoo_client = odoo_client
         self.email_service = email_service
         self.approval_system = approval_system
+        self.odoo_skill_client = get_odoo_skill_client()
         self.event_bus = get_event_bus()
         self.workflow_engine = get_workflow_engine()
         self._invoice_counter = 1000
@@ -82,10 +82,25 @@ class InvoiceService(DomainService):
             # Create invoice entity
             invoice = self._create_invoice_entity(invoice_data)
 
-            # Create in Odoo
-            if self.odoo_client:
-                odoo_data = await self._create_in_odoo(invoice)
-                invoice.odoo_invoice_id = odoo_data["id"]
+            # Create via odoo-accounting-mcp skill
+            skill_data = {
+                "client_name": invoice.client_id,
+                "total_amount": float(invoice.total_amount.amount),
+                "due_date": invoice.due_date.strftime("%Y-%m-%d"),
+                "payment_terms": "Net 30",
+                "tax_rate": 10,
+                "line_items": [
+                    {
+                        "description": item.description,
+                        "quantity": float(item.quantity),
+                        "price": float(item.unit_price.amount),
+                        "unit": "hour"
+                    }
+                    for item in invoice.line_items
+                ]
+            }
+            skill_result = await self.odoo_skill_client.create_invoice(skill_data)
+            invoice.skill_invoice_id = skill_result.get("id")
 
             # Check if approval is required
             if invoice.total_amount.amount > Decimal('100'):
@@ -122,6 +137,12 @@ class InvoiceService(DomainService):
         Raises:
             ValueError: If validation fails
         """
+        # Support aliases for fields
+        if "date" in data and "issue_date" not in data:
+            data["issue_date"] = data["date"]
+        if "client" in data and "client_id" not in data:
+            data["client_id"] = data["client"]
+
         required_fields = ["client_id", "issue_date", "due_date", "line_items"]
         for field in required_fields:
             if field not in data:
@@ -142,10 +163,23 @@ class InvoiceService(DomainService):
                 raise ValueError("Line item unit price must be positive")
 
         # Validate dates
-        issue_date = date.fromisoformat(data["issue_date"])
-        due_date = date.fromisoformat(data["due_date"])
-        if due_date < issue_date:
-            raise ValueError("Due date cannot be before issue date")
+        try:
+            issue_date_val = data["issue_date"]
+            if isinstance(issue_date_val, str):
+                issue_date = date.fromisoformat(issue_date_val)
+            else:
+                issue_date = issue_date_val
+
+            due_date_val = data["due_date"]
+            if isinstance(due_date_val, str):
+                due_date = date.fromisoformat(due_date_val)
+            else:
+                due_date = due_date_val
+                
+            if due_date < issue_date:
+                raise ValueError("Due date cannot be before issue date")
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid date format: {e}")
 
     def _create_invoice_entity(self, data: Dict[str, Any]) -> Invoice:
         """Create invoice entity from data.
@@ -174,14 +208,27 @@ class InvoiceService(DomainService):
             )
             line_items.append(line_item)
 
+        # Fix dates if they are strings
+        issue_date_val = data["issue_date"]
+        if isinstance(issue_date_val, str):
+            issue_date = date.fromisoformat(issue_date_val)
+        else:
+            issue_date = issue_date_val
+
+        due_date_val = data["due_date"]
+        if isinstance(due_date_val, str):
+            due_date = date.fromisoformat(due_date_val)
+        else:
+            due_date = due_date_val
+
         # Create invoice
         invoice = Invoice(
             invoice_number=invoice_number,
             client_id=data["client_id"],
-            client_name=data.get("client_name", ""),
+            client_name=data.get("client_name", data.get("client", "")),
             client_email=data.get("client_email", ""),
-            issue_date=date.fromisoformat(data["issue_date"]),
-            due_date=date.fromisoformat(data["due_date"]),
+            issue_date=issue_date,
+            due_date=due_date,
             line_items=line_items,
             notes=data.get("notes", ""),
             purchase_order=data.get("purchase_order"),
@@ -200,43 +247,7 @@ class InvoiceService(DomainService):
         today = date.today()
         return f"INV-{today.year}-{self._invoice_counter:04d}"
 
-    async def _create_in_odoo(self, invoice: Invoice) -> Dict[str, Any]:
-        """Create invoice in Odoo.
-
-        Args:
-            invoice: Invoice entity
-
-        Returns:
-            Odoo invoice data
-        """
-        if not self.odoo_client:
-            return {"id": f"local_{invoice.id}"}
-
-        # Prepare Odoo data
-        odoo_data = {
-            "partner_id": invoice.client_id,
-            "move_type": "out_invoice",
-            "invoice_date": invoice.issue_date.isoformat(),
-            "invoice_date_due": invoice.due_date.isoformat(),
-            "invoice_line_ids": [],
-            "state": "draft"
-        }
-
-        # Add line items
-        for item in invoice.line_items:
-            line_data = {
-                "name": item.description,
-                "quantity": float(item.quantity),
-                "price_unit": float(item.unit_price.amount),
-                "tax_ids": [],
-                "account_id": 24  # Corrected for Odoo 17 (Product Sales)
-            }
-            odoo_data["invoice_line_ids"].append((0, 0, line_data))
-
-        # Create in Odoo
-        result = await self.odoo_client.create_invoice(odoo_data)
-        return result
-
+    
     async def _request_approval(self, invoice: Invoice) -> Optional[str]:
         """Request approval for invoice.
 
@@ -292,9 +303,10 @@ class InvoiceService(DomainService):
                     logger.warning(f"Invoice {invoice.invoice_number} approval not granted")
                     return False
 
-            # Post in Odoo
-            if self.odoo_client and invoice.odoo_invoice_id:
-                await self.odoo_client.post_invoice(invoice.odoo_invoice_id)
+            
+            # Post via odoo-accounting-mcp skill
+            if hasattr(invoice, 'skill_invoice_id'):
+                await self.odoo_skill_client.post_invoice(invoice.skill_invoice_id)
 
             # Update invoice status
             invoice.status = InvoiceStatus.POSTED

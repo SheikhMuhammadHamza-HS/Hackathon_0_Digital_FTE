@@ -59,16 +59,6 @@ def test_config(temp_dir: Path) -> AppConfig:
     )
 
 
-@pytest.fixture
-def mock_odoo_client():
-    """Create a mock Odoo client."""
-    client = Mock()
-    client.authenticate = AsyncMock(return_value=True)
-    client.create_invoice = AsyncMock(return_value={"id": "test_invoice_123"})
-    client.create_payment = AsyncMock(return_value={"id": "test_payment_123"})
-    client.post_invoice = AsyncMock(return_value=True)
-    client.reconcile_payment = AsyncMock(return_value=True)
-    return client
 
 
 @pytest.fixture

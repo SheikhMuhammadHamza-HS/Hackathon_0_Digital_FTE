@@ -1,0 +1,4 @@
+/.env
+/mcp.json
+/credentials.json
+/.env.local

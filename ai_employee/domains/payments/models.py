@@ -201,8 +201,7 @@ class Payment(BaseEntity):
     reconciled_at: Optional[datetime] = None
     reconciled_by: Optional[str] = None
 
-    # External references
-    odoo_payment_id: Optional[str] = None
+    skill_payment_id: Optional[str] = None
     approval_request_id: Optional[str] = None
     bank_transaction_id: Optional[str] = None
 
@@ -343,7 +342,7 @@ class Payment(BaseEntity):
             'approved_at': self.approved_at.isoformat() if self.approved_at else None,
             'reconciled_at': self.reconciled_at.isoformat() if self.reconciled_at else None,
             'reconciled_by': self.reconciled_by,
-            'odoo_payment_id': self.odoo_payment_id,
+            'skill_payment_id': self.skill_payment_id,
             'approval_request_id': self.approval_request_id,
             'bank_transaction_id': self.bank_transaction_id,
             'match_confidence': self.match_confidence,
@@ -412,8 +411,8 @@ class Payment(BaseEntity):
             approved_at=datetime.fromisoformat(data['approved_at']) if data.get('approved_at') else None,
             reconciled_at=datetime.fromisoformat(data['reconciled_at']) if data.get('reconciled_at') else None,
             reconciled_by=data.get('reconciled_by'),
-            odoo_payment_id=data.get('odoo_payment_id'),
             approval_request_id=data.get('approval_request_id'),
+            skill_payment_id=data.get('skill_payment_id'),
             bank_transaction_id=data.get('bank_transaction_id'),
             match_confidence=data.get('match_confidence', 0.0),
             matched_invoice_amount=matched_invoice_amount,
@@ -436,3 +435,41 @@ class Payment(BaseEntity):
             verified_by=data.get('verified_by'),
             verified_at=datetime.fromisoformat(data['verified_at']) if data.get('verified_at') else None
         )
+
+
+@dataclass
+class PaymentMatch:
+    """Payment to invoice match result."""
+
+    payment_id: str
+    invoice_id: str
+    confidence_score: float
+    match_method: str = "reference"  # reference, amount, client
+    match_details: Dict[str, Any] = field(default_factory=dict)
+    verified: bool = False
+    verified_by: Optional[str] = None
+    verified_at: Optional[datetime] = None
+
+    def __post_init__(self):
+        """Validate payment match."""
+        if not 0 <= self.confidence_score <= 1:
+            raise ValueError("Confidence score must be between 0 and 1")
+
+    def verify(self, verified_by: str) -> None:
+        """Mark match as verified."""
+        self.verified = True
+        self.verified_by = verified_by
+        self.verified_at = datetime.now(timezone.utc)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            'payment_id': self.payment_id,
+            'invoice_id': self.invoice_id,
+            'confidence_score': self.confidence_score,
+            'match_method': self.match_method,
+            'match_details': self.match_details,
+            'verified': self.verified,
+            'verified_by': self.verified_by,
+            'verified_at': self.verified_at.isoformat() if self.verified_at else None
+        }

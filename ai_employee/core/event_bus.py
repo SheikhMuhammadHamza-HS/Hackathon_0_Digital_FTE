@@ -31,7 +31,7 @@ class Event:
     event_id: str = field(default_factory=lambda: f"{datetime.now(timezone.utc).isoformat()}-{id(object())}")
     timestamp: datetime = field(default_factory=datetime.utcnow)
     source: str = field(default_factory="")
-    priority: EventPriority = field(default_factory=EventPriority.NORMAL)
+    priority: EventPriority = EventPriority.NORMAL
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
