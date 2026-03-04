@@ -56,14 +56,17 @@ class FacebookAdapter(SocialMediaAdapter):
 
             async with httpx.AsyncClient() as client:
                 if post.content_type == "image":
+                    # Handle image posting
                     media_url = getattr(post, 'media_url', None)
                     if not media_url:
+                        # Fallback to text post if no image URL
                         endpoint = f"{self._base_url}/{self._page_id}/feed"
                         data = {"message": post.content, "access_token": self._access_token}
                     else:
                         endpoint = f"{self._base_url}/{self._page_id}/photos"
                         data = {"url": media_url, "caption": post.content, "access_token": self._access_token}
                 else:
+                    # Text/Link post
                     endpoint = f"{self._base_url}/{self._page_id}/feed"
                     data = {"message": post.content, "access_token": self._access_token}
 
@@ -76,7 +79,8 @@ class FacebookAdapter(SocialMediaAdapter):
                     return str(post_id)
                 else:
                     logger.error(f"Failed to post to Facebook: {response.text}")
-                    raise Exception(f"Facebook API error: {response_data.get('error', {}).get('message', response.text)}")
+                    error_msg = response_data.get('error', {}).get('message', response.text)
+                    raise Exception(f"Facebook API error: {error_msg}")
 
         except Exception as e:
             logger.error(f"Error posting to Facebook: {e}")
@@ -117,10 +121,11 @@ class FacebookAdapter(SocialMediaAdapter):
             return False
 
     async def get_mentions(self, since: Optional[datetime] = None) -> List[BrandMention]:
-        """Get brand mentions from Facebook."""
+        """Get brand mentions (comments/posts) from Facebook Page."""
         try:
             mentions = []
             async with httpx.AsyncClient() as client:
+                # Get activity/comments where the page is tagged
                 response = await client.get(
                     f"{self._base_url}/{self._page_id}/tagged",
                     params={"access_token": self._access_token}
@@ -141,7 +146,7 @@ class FacebookAdapter(SocialMediaAdapter):
             return []
 
     async def get_engagement_stats(self, post_id: str) -> Dict[str, Any]:
-        """Get engagement statistics for a Facebook post."""
+        """Get engagement statistics (likes, comments, shares) for a post."""
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
@@ -186,7 +191,7 @@ class InstagramAdapter(SocialMediaAdapter):
             self._ig_user_id = credentials.get('instagram_user_id')
 
             if not all([self._access_token, self._ig_user_id]):
-                logger.error("Missing required Instagram credentials")
+                logger.error("Missing required Instagram credentials (access_token or instagram_user_id)")
                 return False
 
             async with httpx.AsyncClient() as client:
@@ -201,7 +206,7 @@ class InstagramAdapter(SocialMediaAdapter):
             return False
 
     async def post_content(self, post: SocialPost) -> str:
-        """Post content to Instagram."""
+        """Post image/video content to Instagram."""
         try:
             if not self.supports_content_type(post.content_type):
                 raise ValueError(f"Instagram requires visual content (image/video)")
@@ -268,11 +273,13 @@ class InstagramAdapter(SocialMediaAdapter):
             return None
 
     async def delete_post(self, post_id: str) -> bool:
-        """Delete an Instagram post."""
+        """Instagram Graph API does not support deleting posts via public API for most app types."""
+        logger.warning("Delete operation not supported for Instagram Graph API")
         return False
 
     async def get_mentions(self, since: Optional[datetime] = None) -> List[BrandMention]:
-        """Get Instagram mentions."""
+        """Get brand mentions from Instagram for the business account."""
+        # This requires searching for hashtags or being tagged in media
         return []
 
     async def get_engagement_stats(self, post_id: str) -> Dict[str, Any]:
