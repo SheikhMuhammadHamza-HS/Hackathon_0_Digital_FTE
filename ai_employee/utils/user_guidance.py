@@ -45,15 +45,7 @@ class UserGuide:
                 "title": "Troubleshooting Guide",
                 "common_issues": [
                     {
-                        "problem": "Odoo connection failed",
-                        "symptoms": ["Invoice creation errors", "Payment reconciliation failures"],
-                        "solutions": [
-                            "Check Odoo server is running",
-                            "Verify database credentials in .env",
-                            "Test with curl: curl http://your-odoo-url:8069",
-                            "Check Odoo user permissions"
-                        ]
-                    },
+                                            },
                     {
                         "problem": "Social media posts not publishing",
                         "symptoms": ["Posts stuck in queue", "Authentication errors"],
@@ -336,7 +328,7 @@ class UserGuide:
                     "name": "Configuration",
                     "items": [
                         {"task": ".env file created from .env.example", "check": "ls ai_employee/.env"},
-                        {"task": "Odoo credentials configured", "check": "grep ODOO_ ai_employee/.env"},
+                        {},
                         {"task": "Email settings configured", "check": "grep EMAIL_ ai_employee/.env"},
                         {"task": "Social media APIs configured", "check": "grep TWITTER_ ai_employee/.env"}
                     ]

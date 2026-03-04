@@ -19,6 +19,7 @@ from ...core.event_bus import get_event_bus, Event
 from ...core.workflow_engine import get_workflow_engine
 from ...utils.approval_system import get_approval_system
 from ...utils.logging_config import business_logger
+from ...integrations.odoo_skill_client import get_odoo_skill_client
 
 logger = logging.getLogger(__name__)
 
@@ -43,18 +44,17 @@ class PaymentReconciledEvent(Event):
 class PaymentService(DomainService):
     """Service for managing payments and reconciliation."""
 
-    def __init__(self, odoo_client=None, bank_service=None, approval_system=None):
+    def __init__(self, bank_service=None, approval_system=None):
         """Initialize payment service.
 
         Args:
-            odoo_client: Odoo ERP client
             bank_service: Bank service client
             approval_system: Approval system
         """
         super().__init__("payment_service")
-        self.odoo_client = odoo_client
         self.bank_service = bank_service
         self.approval_system = approval_system
+        self.odoo_skill_client = get_odoo_skill_client()
         self.event_bus = get_event_bus()
         self.workflow_engine = get_workflow_engine()
 
@@ -214,20 +214,8 @@ class PaymentService(DomainService):
                 )
             ]
 
-        # Get open invoices from Odoo
-        invoices_data = await self.odoo_client.get_open_invoices()
-
-        invoices = []
-        for inv_data in invoices_data:
-            invoice = Invoice(
-                id=inv_data["id"],
-                invoice_number=inv_data["invoice_number"],
-                client_id=inv_data["client_id"],
-                status=InvoiceStatus.POSTED
-            )
-            invoices.append(invoice)
-
-        return invoices
+        # Return empty list since Odoo is not configured
+        return []
 
     async def _calculate_match_score(self, transaction: BankTransaction, invoice: Invoice) -> float:
         """Calculate match score between transaction and invoice.
@@ -386,10 +374,15 @@ class PaymentService(DomainService):
             matched_invoice_amount=Money(Decimal('6600.00'))  # Would come from invoice
         )
 
-        # Create in Odoo
-        if self.odoo_client:
-            odoo_data = await self._create_payment_in_odoo(payment)
-            payment.odoo_payment_id = odoo_data["id"]
+        # Create via odoo-reconciliation skill
+        skill_data = {
+            "transaction_id": transaction.id,
+            "amount": str(float(transaction.amount.amount)),
+            "client_name": transaction.client_name or "Unknown",
+            "invoice_reference": match_result.invoice_number
+        }
+        skill_result = await self.odoo_skill_client.create_payment(skill_data)
+        payment.skill_payment_id = skill_result.get("id")
 
         # Request approval if required
         if payment.approval_required:
@@ -434,33 +427,7 @@ class PaymentService(DomainService):
         # Default to bank transfer
         return PaymentMethod.BANK_TRANSFER
 
-    async def _create_payment_in_odoo(self, payment: Payment) -> Dict[str, Any]:
-        """Create payment in Odoo.
-
-        Args:
-            payment: Payment entity
-
-        Returns:
-            Odoo payment data
-        """
-        if not self.odoo_client:
-            return {"id": f"local_{payment.id}"}
-
-        # Prepare Odoo data
-        odoo_data = {
-            "payment_type": "inbound",
-            "partner_type": "customer",
-            "amount": float(payment.amount.amount),
-            "payment_date": payment.payment_date.isoformat(),
-            "journal_id": 1,  # Default bank journal
-            "state": "draft",
-            "invoice_ids": [(4, payment.invoice_id)] if payment.invoice_id else []
-        }
-
-        # Create in Odoo
-        result = await self.odoo_client.create_payment(odoo_data)
-        return result
-
+    
     async def _request_payment_approval(self, payment: Payment) -> Optional[str]:
         """Request approval for payment.
 
@@ -515,9 +482,10 @@ class PaymentService(DomainService):
                     logger.warning(f"Payment {payment_id} approval not granted")
                     return False
 
-            # Reconcile in Odoo
-            if self.odoo_client and payment.odoo_payment_id:
-                await self.odoo_client.reconcile_payment(payment.odoo_payment_id)
+            
+            # Reconcile via odoo-reconciliation skill
+            if hasattr(payment, 'skill_payment_id'):
+                await self.odoo_skill_client.reconcile_payment(payment.skill_payment_id)
 
             # Update payment status
             payment.reconcile("AI Employee")

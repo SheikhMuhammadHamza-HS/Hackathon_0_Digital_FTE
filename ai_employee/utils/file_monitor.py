@@ -293,7 +293,7 @@ class ImageProcessor(FileProcessor):
         }
 
 
-class FileSystemEventHandler(FileSystemEventHandler):
+class FileEventHandler(FileSystemEventHandler):
     """Handler for watchdog file system events."""
 
     def __init__(self, monitor: 'FileMonitor'):
@@ -304,6 +304,7 @@ class FileSystemEventHandler(FileSystemEventHandler):
         """
         super().__init__()
         self.monitor = monitor
+        self.loop = asyncio.get_running_loop()
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
     def on_created(self, event: FileSystemEvent) -> None:
@@ -313,10 +314,10 @@ class FileSystemEventHandler(FileSystemEventHandler):
             event: File system event
         """
         if not event.is_directory:
-            asyncio.create_task(self._handle_file_event(
-                FileEventType.CREATED,
-                Path(event.src_path)
-            ))
+            asyncio.run_coroutine_threadsafe(
+                self._handle_file_event(FileEventType.CREATED, Path(event.src_path)),
+                self.loop
+            )
 
     def on_modified(self, event: FileSystemEvent) -> None:
         """Handle file modification.
@@ -325,10 +326,10 @@ class FileSystemEventHandler(FileSystemEventHandler):
             event: File system event
         """
         if not event.is_directory:
-            asyncio.create_task(self._handle_file_event(
-                FileEventType.MODIFIED,
-                Path(event.src_path)
-            ))
+            asyncio.run_coroutine_threadsafe(
+                self._handle_file_event(FileEventType.MODIFIED, Path(event.src_path)),
+                self.loop
+            )
 
     def on_deleted(self, event: FileSystemEvent) -> None:
         """Handle file deletion.
@@ -337,10 +338,10 @@ class FileSystemEventHandler(FileSystemEventHandler):
             event: File system event
         """
         if not event.is_directory:
-            asyncio.create_task(self._handle_file_event(
-                FileEventType.DELETED,
-                Path(event.src_path)
-            ))
+            asyncio.run_coroutine_threadsafe(
+                self._handle_file_event(FileEventType.DELETED, Path(event.src_path)),
+                self.loop
+            )
 
     def on_moved(self, event: FileSystemEvent) -> None:
         """Handle file move.
@@ -349,11 +350,14 @@ class FileSystemEventHandler(FileSystemEventHandler):
             event: File system event
         """
         if not event.is_directory:
-            asyncio.create_task(self._handle_file_event(
-                FileEventType.MOVED,
-                Path(event.dest_path),
-                Path(event.src_path)
-            ))
+            asyncio.run_coroutine_threadsafe(
+                self._handle_file_event(
+                    FileEventType.MOVED,
+                    Path(event.dest_path),
+                    Path(event.src_path)
+                ),
+                self.loop
+            )
 
     async def _handle_file_event(
         self,
@@ -522,7 +526,7 @@ class FileMonitor:
 
         # Create observer
         observer = Observer()
-        event_handler = FileSystemEventHandler(self)
+        event_handler = FileEventHandler(self)
 
         # Schedule monitoring
         observer.schedule(event_handler, str(path), recursive=True)

@@ -1075,11 +1075,11 @@ class ProcessWatchdog:
         """Register event handlers."""
         # Subscribe to health monitor events
         from ..utils.health_monitor import HealthEvent
-        await self.event_bus.subscribe(HealthEvent, self._handle_health_event)
+        self.event_bus.subscribe(HealthEvent, self._handle_health_event)
 
         # Subscribe to error events
         from ..utils.error_recovery import ErrorEvent
-        await self.event_bus.subscribe(ErrorEvent, self._handle_error_event)
+        self.event_bus.subscribe(ErrorEvent, self._handle_error_event)
 
     async def _handle_health_event(self, event: Event) -> None:
         """Handle health monitoring events.

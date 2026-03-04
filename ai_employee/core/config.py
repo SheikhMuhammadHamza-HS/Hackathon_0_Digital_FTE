@@ -26,6 +26,17 @@ class DatabaseConfig:
 
 
 @dataclass
+class OdooConfig:
+    """Odoo ERP configuration."""
+    url: str
+    database: str
+    username: str
+    password: str
+    timeout: int = 30
+    max_retries: int = 3
+
+
+@dataclass
 class EmailConfig:
     """Email service configuration."""
     host: str
@@ -37,15 +48,6 @@ class EmailConfig:
     timeout: int = 30
 
 
-@dataclass
-class OdooConfig:
-    """Odoo ERP configuration."""
-    url: str
-    database: str
-    username: str
-    password: str
-    timeout: int = 30
-    max_retries: int = 3
 
 
 @dataclass
@@ -132,6 +134,7 @@ class PathsConfig:
     logs_path: Path
     reports_path: Path
     archive_path: Path
+    config_path: Path
 
 
 @dataclass
@@ -245,6 +248,7 @@ class ConfigManager:
                 timeout=int(os.getenv("EMAIL_TIMEOUT", "30")),
             )
 
+        
         # Odoo configuration
         if os.getenv("ODOO_URL"):
             config.odoo = OdooConfig(
@@ -317,6 +321,7 @@ class ConfigManager:
             logs_path=vault_path / "Logs",
             reports_path=vault_path / "Reports",
             archive_path=vault_path / "Archive",
+            config_path=vault_path / "Config",
         )
 
         return config

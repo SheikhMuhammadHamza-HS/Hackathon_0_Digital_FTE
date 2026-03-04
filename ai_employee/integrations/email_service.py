@@ -271,7 +271,7 @@ class EmailService:
                 formatted.append(addr)
             else:
                 # Format as "Name <email>"
-                formatted.append(formataddr(("", addr))
+                formatted.append(formataddr(("", addr)))
 
         return ", ".join(formatted)
 

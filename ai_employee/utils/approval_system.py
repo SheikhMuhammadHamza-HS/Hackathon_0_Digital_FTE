@@ -107,23 +107,25 @@ class ApprovalRequest:
         return cls(**data)
 
 
+@dataclass
 class ApprovalRequiredEvent(Event):
     """Event fired when approval is required."""
-    request_id: str
-    item_type: str
-    item_id: str
+    request_id: str = field(default_factory=str)
+    item_type: str = field(default_factory=str)
+    item_id: str = field(default_factory=str)
     amount: Optional[float] = None
     reason: str = ""
     expires_at: Optional[datetime] = None
 
 
+@dataclass
 class ApprovalDecisionEvent(Event):
     """Event fired when approval decision is made."""
-    request_id: str
-    item_type: str
-    item_id: str
-    approved: bool
-    approved_by: str
+    request_id: str = field(default_factory=str)
+    item_type: str = field(default_factory=str)
+    item_id: str = field(default_factory=str)
+    approved: bool = False
+    approved_by: str = ""
     notes: Optional[str] = None
 
 
