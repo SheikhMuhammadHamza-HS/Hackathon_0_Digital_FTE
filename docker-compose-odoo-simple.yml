@@ -19,8 +19,7 @@ services:
       PORT: 5432
       USER: ${ODOO_DB_USER:-odoo}
       PASSWORD: ${ODOO_DB_PASSWORD:-odoo}
-    depends_on:
-      - odoo-db
+    command: odoo -d ${ODOO_DB:-odoo}
     ports:
       - "8069:8069"
     volumes:
@@ -32,6 +31,7 @@ services:
 volumes:
   odoo-db-data:
   odoo-data:
+
 
 networks:
   odoo-network:
