@@ -141,7 +141,7 @@ for approved_file in approved_files:
                         due_date = m.group(0)
 
             # Write Odoo trigger
-            vault_na = Path("./Vault/Needs_Action")
+            vault_na = Path("./Vault/Odoo/Triggers")
             vault_na.mkdir(parents=True, exist_ok=True)
             ts = datetime.now().strftime('%Y%m%dT%H%M%SZ')
             trigger_path = vault_na / f"odoo-invoice-{ts}.md"
@@ -201,6 +201,6 @@ print(f"  Done/ folder: {DONE_DIR.resolve()}")
 if Path("./Vault/Invoice_Ledger.md").exists():
     print(f"\n  Invoice Ledger: {Path('./Vault/Invoice_Ledger.md').resolve()}")
 
-print("\n  Next Step: Odoo trigger files are in Vault/Needs_Action/")
-print("  The odoo-accounting-mcp skill will post them to Odoo.")
+print("\n  Next Step: Odoo trigger files are in Vault/Odoo/Triggers/")
+print("  The odoo-accounting-mcp skill or Unified Watcher will post them to Odoo.")
 print("=" * 65)

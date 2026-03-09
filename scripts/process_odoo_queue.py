@@ -19,8 +19,8 @@ async def process_odoo_queue():
     print("🚀 ODOO QUEUE PROCESSOR — SYNCING TRIGGERS TO ERP")
     print("="*70)
     
-    trigger_dir = Path("./Vault/Needs_Action")
-    archive_dir = Path("./Vault/Archive/Odoo_Triggers")
+    trigger_dir = Path("./Vault/Odoo/Triggers")
+    archive_dir = Path("./Vault/Odoo/Archive")
     archive_dir.mkdir(parents=True, exist_ok=True)
     
     triggers = list(trigger_dir.glob("odoo-invoice-*.md"))

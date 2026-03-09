@@ -60,28 +60,28 @@ SELECTORS = {
         'div[class*="qrcode"]',
         'div[class*="QRCode"]',
     ],
-    # Unread indicator - badges with numbers
+    # Unread indicator - badges with numbers (Strict version)
     "unread_badge": [
         'span[data-testid="icon-unread-count"]',
-        'span[aria-label*="unread message count"]',
-        'span[aria-label*="unread count"]',
-        'span[class*="unread"]',
-        'div[class*="unread"]',
         'span[aria-label*="unread"]',
+        'span[class*="unread"]',
+        'div[class*="unread_"]'
     ],
     # Message container - individual messages
     "message_container": [
-        # WhatsApp's obfuscated class patterns (most recent as of 2026)
-        'div[class*="_ak9"]',
-        'div[class*="_ak7"]',
-        'div[class*="_ao"]',
-        'div[class*="_am"]',
-        'div[role="log"]',
         'div[data-testid="msg-container"]',
-        'div[data-testid="message-container"]',
-        'div[class*="message-container"]',
-        'div[class*="msg-container"]',
-        'div[data-testid="conversation-panel-messages"]',
+        'div[class*="_ak8j"]',
+        'div[class*="_ak8h"]',
+        'div[role="row"]',
+        'div[class*="message-in"]',
+        'div[class*="message-out"]',
+    ],
+    # Chat list items
+    "chat_item": [
+        '[data-testid="chat-list-item"]',
+        '[role="listitem"]',
+        'div._ak72',
+        'div._ak73',
     ],
     # Message text - selectable content
     "message_text": [
@@ -95,10 +95,9 @@ SELECTORS = {
     ],
     # Sender name in chat header
     "chat_header": [
-        '[data-testid="conversation-panel-header"]',
-        'header[data-testid="conversation-header"]',
-        'div[class*="header"]',
-        'div[class*="chat-header"]',
+        'header [title]',
+        'header span[dir="auto"]',
+        '[data-testid="conversation-header"]',
     ],
     # Back button to return to chat list
     "back_button": [
@@ -648,319 +647,168 @@ class WhatsAppWatcher:
 
     async def _get_unread_messages(self) -> List[Dict[str, Any]]:
         """Get list of unread messages from WhatsApp Web.
-
+        
         Returns:
-            List of message dictionaries
+           List of message dictionaries
         """
         messages = []
-
         if not self._page:
-            logger.warning("Page not initialized")
             return messages
 
         try:
             logger.info("=" * 50)
-            logger.info("Starting message extraction...")
+            logger.info("Checking for NEW unread messages...")
             logger.info("=" * 50)
 
-            # Step 1: Find the chat list container
-            chat_list_container = None
-            for selector in SELECTORS["chat_list"]:
-                try:
-                    el = await self._page.query_selector(selector)
-                    if el and await el.is_visible():
-                        chat_list_container = el
-                        logger.info(f"Found chat list with selector: {selector}")
-                        break
-                except Exception as e:
-                    logger.debug(f"Selector {selector} failed: {e}")
-                    continue
-
-            if not chat_list_container:
-                logger.warning("Could not find chat list!")
-                # Take diagnostic screenshot
-                try:
-                    await self._page.screenshot(path=str(Path(settings.LOGS_PATH) / "no_chat_list.png"))
-                except:
-                    pass
-                return messages
-
-            # Step 2: Find all chat items in the list
-            chat_items = await self._page.query_selector_all('[role="listitem"]')
-            logger.info(f"Found {len(chat_items)} chat items in sidebar")
-
+            # Step 1: Find all chat items in the sidebar
+            # We look for containers that represent a single chat row
+            chat_selectors = ['[role="listitem"]', '[data-testid="chat-list-item"]', 'div._ak72', 'div._ak73']
+            chat_items = []
+            for sel in chat_selectors:
+                items = await self._page.query_selector_all(sel)
+                if items:
+                    chat_items = items
+                    break
+            
             if not chat_items:
-                # Try alternative - all clickable divs in chat list
-                chat_items = await chat_list_container.query_selector_all('div')
-                logger.info(f"Fallback: found {len(chat_items)} divs in chat list")
+                logger.info("No chat items found in sidebar.")
+                return []
 
-            # Step 3: Find chats with unread indicators
-            unread_chats = []
-            for i, chat in enumerate(chat_items[:15]):  # Check first 15
+            # Step 2: Identify chats with explicit unread badges
+            unread_targets = []
+            seen_names = set()
+            
+            for i, chat in enumerate(chat_items[:20]): # Check top 20 chats
                 try:
-                    # Check for unread badge/number
-                    html = await chat.evaluate('el => el.outerHTML')
-                    classes = await chat.get_attribute('class') or ''
-
-                    # Look for unread patterns
-                    has_unread = (
-                        'unread' in classes.lower() or
-                        '_ak' in classes or  # WhatsApp internal classes
-                        await chat.query_selector('[data-testid="icon-unread-count"]') is not None or
-                        await chat.query_selector('span[aria-label*="unread"]') is not None
-                    )
-
-                    if has_unread:
-                        unread_chats.append(chat)
-                        logger.info(f"Chat {i}: Has unread indicator")
-                except Exception as e:
-                    logger.debug(f"Error checking chat {i}: {e}")
-
-            logger.info(f"Found {len(unread_chats)} chats with unread indicators")
-
-            # If no explicit unread found, take the first few chats as potential new messages
-            if not unread_chats:
-                logger.info("No unread badges found - checking recent chats for new messages")
-                unread_chats = chat_items[:3]  # Check first 3 chats
-
-            # Step 4: Process each unread chat
-            for i, chat in enumerate(unread_chats):
-                try:
-                    logger.info("-" * 30)
-                    logger.info(f"Processing chat {i + 1}/{len(unread_chats)}")
-
-                    # Get chat name before clicking
-                    chat_name = "Unknown"
-                    try:
-                        name_el = await chat.query_selector('span[class*="title"], div[class*="title"], span[title]')
-                        if name_el:
-                            chat_name = await name_el.get_attribute('title') or await name_el.text_content() or "Unknown"
-                            chat_name = chat_name.strip()[:100]
-                    except Exception:
-                        pass
-
-                    logger.info(f"Chat name: {chat_name}")
-
-                    # Click on the chat
-                    try:
-                        await chat.click()
-                        await asyncio.sleep(random.uniform(1.5, 2.5))
-                        logger.info("Clicked on chat")
-                    except Exception as click_err:
-                        logger.warning(f"Click failed: {click_err}")
-                        # Try using JavaScript click
-                        try:
-                            await self._page.evaluate('el => el.click()', chat)
-                            await asyncio.sleep(2)
-                        except:
-                            continue
-
-                    # Step 5: Wait for chat to load
-                    chat_loaded = False
-                    for wait_attempt in range(5):
-                        try:
-                            # Check if chat header is visible
-                            header = await self._page.query_selector('[data-testid="conversation-header"], header')
-                            if header and await header.is_visible():
-                                chat_loaded = True
-                                logger.info(f"Chat loaded (attempt {wait_attempt + 1})")
-                                break
-                        except:
-                            pass
-                        await asyncio.sleep(1)
-
-                    if not chat_loaded:
-                        logger.warning("Chat did not load properly")
+                    # Look for unread count badge (green circle)
+                    badge = await chat.query_selector('[data-testid="icon-unread-count"], span[aria-label*="unread"]')
+                    if not badge:
                         continue
+                    
+                    # Verify it has numeric or text content indicating a new message
+                    badge_text = await badge.text_content()
+                    if not badge_text and 'unread' not in (await badge.get_attribute('aria-label') or '').lower():
+                        continue
+                        
+                    # Get chat name FROM SIDEBAR (Source of Truth)
+                    name_el = await chat.query_selector('span[title], [class*="title"]')
+                    chat_name = "Unknown"
+                    if name_el:
+                        chat_name = (await name_el.get_attribute('title') or await name_el.text_content() or "Unknown").strip()
+                    
+                    if chat_name in seen_names:
+                        continue
+                        
+                    unread_targets.append((chat, chat_name))
+                    seen_names.add(chat_name)
+                    logger.info(f"Detected {badge_text or 'new'} messages in chat: '{chat_name}'")
+                except: continue
 
-                    # Step 6: Extract sender name from header
+            if not unread_targets:
+                logger.info("No unread badges found.")
+                return []
+
+            # Step 3: Process identified chats
+            for idx, (chat_el, chat_name) in enumerate(unread_targets):
+                try:
+                    logger.info(f"Processing chat {idx+1}/{len(unread_targets)}: {chat_name}")
+                    
+                    # Click chat to open
+                    await chat_el.scroll_into_view_if_needed()
+                    await chat_el.click()
+                    await asyncio.sleep(2) # Wait for panel to load
+                    
+                    # Verify sender name from the opened header (if it matches or is better)
                     sender = chat_name
-                    try:
-                        # Try multiple ways to get sender name
-                        for header_selector in [
-                            '[data-testid="conversation-header"]',
-                            'header [class*="title"]',
-                            'header span',
-                            '[data-testid="conversation-panel-header"]'
-                        ]:
-                            header_el = await self._page.query_selector(header_selector)
-                            if header_el:
-                                text = await header_el.text_content()
-                                if text and text.strip() and text.strip() != "Hamza Digital FTE":
-                                    sender = text.strip()[:100]
-                                    logger.info(f"Sender from header: {sender}")
-                                    break
-                    except Exception as e:
-                        logger.debug(f"Failed to get sender: {e}")
-
-                    # Step 7: Get messages from chat
-                    logger.info("Extracting messages...")
-
-                    # Try to find message container
-                    msg_containers = []
-                    for msg_selector in [
-                        'div[role="log"]',
-                        'div[data-testid="message-container"]',
-                        'div[data-testid="msg-container"]',
-                        'div[class*="message-container"]',
-                        'div[class*="msg-container"]'
-                    ]:
-                        try:
-                            containers = await self._page.query_selector_all(msg_selector)
-                            if containers:
-                                msg_containers = containers
-                                logger.info(f"Found {len(msg_containers)} messages with: {msg_selector}")
-                                break
-                        except:
+                    header_name_el = await self._page.query_selector('header [title], header span[dir="auto"]')
+                    if header_name_el:
+                        header_text = (await header_name_el.get_attribute('title') or await header_name_el.text_content() or "").strip()
+                        if header_text and len(header_text) > 1 and 'refreshed' not in header_text.lower():
+                            sender = header_text
+                    
+                    # Extract last message
+                    msg_text = ""
+                    msg_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    # Find message containers
+                    msg_containers = await self._page.query_selector_all('[data-testid="msg-container"], .message-in, ._ak8j, ._ak8h')
+                    if msg_containers:
+                        # Process only the LATEST message
+                        latest_msg = msg_containers[-1]
+                        
+                        # Target text span specifically
+                        text_span = await latest_msg.query_selector('span.selectable-text, [data-testid="selectable-text"]')
+                        if text_span:
+                            msg_text = (await text_span.text_content() or "").strip()
+                        
+                        # If failed, try raw text but filter metadata
+                        if not msg_text:
+                            raw = (await latest_msg.text_content() or "").strip()
+                            # Remove trailing time indicators (e.g. "10:30 PM")
+                            import re
+                            msg_text = re.sub(r'\d{1,2}:\d{2}\s?(?:AM|PM)?$', '', raw).strip()
+                            
+                        # Filter system/junk strings
+                        junk = ['forwarded', 'unread message', 'status-dblcheck', 'encryption', 'typing...', 'audio-play']
+                        if any(j in msg_text.lower() for j in junk) or len(msg_text) < 1:
+                            logger.info(f"Skipped system/junk message: {msg_text[:30]}...")
                             continue
 
-                    # Fallback: get all message-like divs
-                    if not msg_containers:
-                        logger.info("Trying fallback message extraction...")
-                        # Get the main chat area content
-                        all_divs = await self._page.query_selector_all('div')
-                        for div in all_divs[-30:]:  # Check last 30 divs
-                            try:
-                                text = await div.text_content()
-                                if text and len(text.strip()) > 5:
-                                    classes = await div.get_attribute('class') or ''
-                                    # Check if it looks like a message
-                                    if '_ao' in classes or 'message' in classes.lower():
-                                        msg_containers.append(div)
-                            except:
-                                continue
-                        logger.info(f"Fallback: found {len(msg_containers)} potential messages")
-
-                    # Step 8: Process messages (get last few)
-                    if msg_containers:
-                        messages_to_check = msg_containers[-10:]  # Last 10 messages
-                        logger.info(f"Processing {len(messages_to_check)} recent messages")
-
-                        for msg_idx, msg_container in enumerate(messages_to_check):
-                            try:
-                                # Extract message text
-                                message_text = ""
-                                for text_selector in [
-                                    'span.selectable-text',
-                                    'span[class*="selectable"]',
-                                    'div[class*="text"]',
-                                    'span[data-testid="message-text"]'
-                                ]:
-                                    try:
-                                        text_el = await msg_container.query_selector(text_selector)
-                                        if text_el:
-                                            content = await text_el.text_content()
-                                            if content and content.strip():
-                                                message_text = content.strip()
-                                                break
-                                    except:
-                                        continue
-
-                                # Fallback: get all text from container
-                                if not message_text:
-                                    try:
-                                        message_text = await msg_container.text_content()
-                                        message_text = message_text.strip() if message_text else ""
-                                    except:
-                                        pass
-
-                                if not message_text:
-                                    continue
-
-                                # Get timestamp
-                                timestamp = ""
-                                for time_selector in [
-                                    'span[aria-label]',
-                                    'span[class*="meta"]',
-                                    'span[data-testid="msg-meta"]'
-                                ]:
-                                    try:
-                                        time_el = await msg_container.query_selector(time_selector)
-                                        if time_el:
-                                            ts = await time_el.get_attribute('aria-label') or await time_el.text_content()
-                                            if ts:
-                                                timestamp = ts.strip()
-                                                break
-                                    except:
-                                        continue
-
-                                # Get message ID if available
-                                msg_id = await msg_container.get_attribute('data-id') or ""
-                                if not msg_id:
-                                    msg_id = f"{sender}_{message_text[:20]}_{timestamp}"
-
-                                # Create message dict
-                                msg_hash = hashlib.md5(
-                                        f"{msg_id}{message_text}{timestamp}".encode()
-                                    ).hexdigest()
-
-                                message = {
-                                    'id': msg_id,
-                                    'sender': sender,
-                                    'text': message_text[:5000],
-                                    'timestamp': timestamp,
-                                    'hash': msg_hash
-                                }
-
-                                # Avoid duplicates
-                                if msg_hash not in [m.get('hash', '') for m in messages]:
-                                    messages.append(message)
-                                    logger.info(f"✓ Extracted message {msg_idx + 1}: {message_text[:50]}...")
-                                else:
-                                    logger.debug(f"Duplicate message skipped: {message_text[:30]}")
-
-                            except Exception as e:
-                                logger.debug(f"Error processing message {msg_idx}: {e}")
-                                continue
-                    else:
-                        logger.warning("No message containers found!")
-
-                    # Step 9: Go back to chat list
-                    try:
-                        back_btn = await self._page.query_selector('[data-testid="back"], [data-testid="chevron-left"]')
-                        if back_btn and await back_btn.is_visible():
-                            await back_btn.click()
-                            await asyncio.sleep(1)
-                            logger.info("Returned to chat list")
-                    except:
-                        # Navigate back to chat list via URL
-                        await self._page.goto("https://web.whatsapp.com", timeout=30000)
-                        await asyncio.sleep(3)
-
+                        # Get message ID for hashing
+                        msg_id = await latest_msg.get_attribute('data-id') or f"{sender}_{hash(msg_text)}"
+                        msg_hash = hashlib.md5(f"{msg_id}{msg_text}".encode()).hexdigest()
+                        
+                        if msg_hash not in self.processed_hashes:
+                            messages.append({
+                                'id': msg_id,
+                                'sender': sender,
+                                'text': msg_text,
+                                'timestamp': msg_timestamp,
+                                'hash': msg_hash
+                            })
+                            logger.info(f"✓ New message from {sender}: {msg_text[:50]}...")
+                        else:
+                            logger.debug(f"Message already processed: {msg_text[:30]}")
+                            
+                    # Deselect chat by pressing Escape or clicking search
+                    await self._page.keyboard.press('Escape')
+                    await asyncio.sleep(0.5)
+                    await self._page.keyboard.press('Escape')
+                    
                 except Exception as e:
-                    logger.error(f"Error processing chat {i}: {e}")
-                    import traceback
-                    logger.debug(traceback.format_exc())
+                    logger.error(f"Error processing chat '{chat_name}': {e}")
                     continue
 
-            logger.info("=" * 50)
-            logger.info(f"Extraction complete: {len(messages)} messages found")
-            logger.info("=" * 50)
+            return messages
 
         except Exception as e:
-            logger.error(f"Error getting messages: {e}")
-            import traceback
-            logger.debug(traceback.format_exc())
+            logger.error(f"Extraction loop error: {e}")
+            return []
 
-        return messages
-
-    async def _create_task_file(self, message: Dict[str, Any]) -> Optional[Path]:
-        """Create a task file for a WhatsApp message."""
+    def _create_task_file(self, message: Dict[str, Any]) -> Optional[Path]:
+        """Create a markdown task file for a WhatsApp message.
+        
+        Args:
+            message: Message dictionary with sender, text, etc.
+            
+        Returns:
+            Path to the created file, or None if skipped/failed
+        """
         try:
-            msg_hash = self._create_message_hash(message)
-            if msg_hash in self.processed_hashes:
-                logger.debug("Message already processed: %s", msg_hash)
-                return None
-
-            # Extract message data with defaults
-            msg_id = message.get('id', '') or f"msg_{int(time.time())}"
+            msg_id = message.get('id', 'unknown')
             sender = message.get('sender', 'Unknown')
             msg_text = message.get('text', '')
             msg_timestamp = message.get('timestamp', '')
+            msg_hash = message.get('hash', '')
 
-            timestamp = datetime.now().isoformat()
+            # Check for existing hash
+            if msg_hash in self.processed_hashes:
+                return None
+
+            timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+            # Clean sender name for filename
             safe_sender = "".join(c if c.isalnum() or c in '-_' else '_' for c in sender)[:30]
-            task_id = f"WHATSAPP_{timestamp.replace(':', '-').replace('.', '-')}_{safe_sender}"
+            task_id = f"WHATSAPP_{timestamp}_{safe_sender}"
 
             content = f"""---
 type: whatsapp_message
@@ -970,6 +818,7 @@ hash: "{msg_hash}"
 received_at: "{msg_timestamp}"
 detected_at: "{timestamp}"
 status: pending
+platform: whatsapp
 ---
 
 ## WhatsApp Message from {sender}
@@ -983,31 +832,21 @@ status: pending
 ---
 
 ## Actions Required
-- [x] Read and understand message
+- [ ] Read and understand message
 - [ ] Generate contextual response using Gemini AI
 - [ ] Save draft to Pending_Approval for human review
 - [ ] Mark as processed
 """
-
             file_path = self.needs_action_path / f"{task_id}.md"
-
-            if not is_safe_path(str(file_path), str(self.needs_action_path)):
-                logger.warning("Unsafe path blocked for message %s", msg_id)
-                return None
-
             file_path.write_text(content, encoding='utf-8')
+            
             self.processed_hashes.add(msg_hash)
-            self._save_processed_hashes()  # Persist immediately
-
+            self._save_processed_hashes()
+            
             logger.info("✓ Created task file: %s", file_path.name)
-            logger.info("  - Sender: %s", sender)
-            logger.info("  - Message: %s", msg_text[:100] + "..." if len(msg_text) > 100 else msg_text)
             return file_path
-
         except Exception as e:
-            logger.error("Failed to create task file: %s", e)
-            import traceback
-            logger.debug(traceback.format_exc())
+            logger.error(f"Failed to create task file: {e}")
             return None
 
     async def _process_new_messages(self) -> int:
