@@ -109,10 +109,11 @@ for approved_file in approved_files:
 
             for line in content.splitlines():
                 ll = line.lower()
-                if re.search(r"hackathon client|dummy corp|test client", line, re.I):
-                    m = re.search(r"(hackathon client|dummy corp|test client)", line, re.I)
-                    if m:
-                        client_name = m.group(1)
+                # Generic client name extraction
+                if "client:" in ll:
+                    parts = line.split(":", 1)
+                    if len(parts) > 1:
+                        client_name = parts[1].strip()
                 if "total due" in ll:
                     amounts = re.findall(r"\$[\d,]+\.?\d*", line)
                     if amounts:
