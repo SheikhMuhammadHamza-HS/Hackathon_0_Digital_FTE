@@ -20,13 +20,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Override paths
-os.environ.setdefault("NEEDS_ACTION_PATH", "./Needs_Action")
-os.environ.setdefault("PENDING_APPROVAL_PATH", "./Pending_Approval")
-os.environ.setdefault("APPROVED_PATH", "./Approved")
-os.environ.setdefault("DONE_PATH", "./Done")
+os.environ.setdefault("NEEDS_ACTION_PATH", "./Vault/Workflow/Needs_Action")
+os.environ.setdefault("PENDING_APPROVAL_PATH", "./Vault/Workflow/Pending_Approval")
+os.environ.setdefault("APPROVED_PATH", "./Vault/Workflow/Approved")
+os.environ.setdefault("DONE_PATH", "./Vault/Workflow/Done")
 
-APPROVED_DIR = Path("./Approved")
-DONE_DIR = Path("./Done")
+APPROVED_DIR = Path("./Vault/Workflow/Approved")
+DONE_DIR = Path("./Vault/Workflow/Done")
 
 DONE_DIR.mkdir(exist_ok=True)
 
@@ -95,10 +95,23 @@ for approved_file in approved_files:
             print(f"  [ERROR] ActionExecutor failed: {e}")
             success = False
 
-    if not success:
-        # Fallback for file_action: just treat as success and log
-        if platform == "file_action" or "invoice" in approved_file.name.lower():
-            print(f"  [FALLBACK] Recording invoice action as executed")
+        # EXECUTION DISPATCHER
+        if platform == "email" or "gmail" in approved_file.name.lower():
+            print(f"  [GMAIL]   Detected Email Task — Attempting to send...")
+            try:
+                from src.agents.email_sender import EmailSender
+                sender = EmailSender()
+                success = sender.send_draft(approved_file)
+                if success:
+                    print(f"  ✅ SUCCESS: Email sent to recipient!")
+                else:
+                    print(f"  ❌ FAILED: Could not send email via Gmail API.")
+            except Exception as e:
+                print(f"  ❌ ERROR: EmailSender failed: {e}")
+                success = False
+
+        elif platform == "file_action" or "invoice" in approved_file.name.lower():
+            print(f"  [ODOO]    Detected Invoice Task — Recording action...")
 
             # Write to Vault ledger manually
             import re
