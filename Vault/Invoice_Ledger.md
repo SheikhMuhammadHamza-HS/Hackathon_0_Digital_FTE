@@ -9,3 +9,5 @@
 | 2026-03-09 01:30 | Unknown Client |  | $8,500.00 |  | SUBMITTED_TO_ODOO | hamza_test_invoice.md |
 | 2026-03-09 19:46 | Unknown Client |  | $1,000.00 |  | SUBMITTED_TO_ODOO | modular_test_invoice.md |
 | 2026-03-09 22:10 | Test Client |  | $0.00 |  | SUBMITTED_TO_ODOO | demo_odoo_invoice.md |
+| 2026-03-10 06:59 | Dummy Corp | INV-OD007 | $15,000.00 | 2026-04-10 | SUBMITTED_TO_ODOO | end_to_end_odoo_test.md |
+| 2026-03-10 07:16 | Unknown Client | INV-0099 | $5,000.00 | 2026-03-10 | SUBMITTED_TO_ODOO | my_test_invoice.md |
