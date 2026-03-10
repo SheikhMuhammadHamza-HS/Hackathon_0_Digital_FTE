@@ -36,6 +36,12 @@ class ActionExecutor:
         self.whatsapp_sender = WhatsAppSender(mode="playwright")
         self.dashboard = DashboardUpdater()
 
+    def set_whatsapp_page(self, page):
+        """Inject an existing Playwright page into the WhatsApp sender agent."""
+        if hasattr(self.whatsapp_sender, "set_playwright_page"):
+            self.whatsapp_sender.set_playwright_page(page)
+            logger.info("Shared WhatsApp browser session established.")
+
     def _extract_platform(self, draft_path: Path) -> str:
         """Return the platform value from the draft header.
 
@@ -243,8 +249,8 @@ class ActionExecutor:
                     if m:
                         due_date = m.group(0)
 
-            # --- Write trigger file for odoo-accounting-mcp skill ---
-            skill_trigger_dir = Path("./Vault/Needs_Action")
+            # --- Write trigger file for Odoo Sync ---
+            skill_trigger_dir = Path("./Vault/Odoo/Triggers")
             skill_trigger_dir.mkdir(parents=True, exist_ok=True)
 
             trigger_filename = f"odoo-invoice-{datetime.now().strftime('%Y%m%dT%H%M%SZ')}.md"
