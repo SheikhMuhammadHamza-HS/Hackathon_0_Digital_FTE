@@ -227,14 +227,18 @@ class ActionExecutor:
             invoice_number = ""
             due_date = ""
 
-            for line in content.splitlines():
+            lines = content.splitlines()
+            for i, line in enumerate(lines):
                 ll = line.lower()
                 if "bill to:" in ll or "**bill to:**" in ll:
                     # Next non-empty line is client name
-                    pass
-                if re.search(r"hackathon client|dummy corp|test client", line, re.I):
+                    for next_line in lines[i+1:]:
+                        if next_line.strip():
+                            client_name = next_line.strip()
+                            break
+                elif re.search(r"hackathon client|dummy corp|test client", line, re.I):
                     m = re.search(r"(hackathon client|dummy corp|test client)", line, re.I)
-                    if m:
+                    if m and client_name == "Unknown Client":
                         client_name = m.group(1)
                 if "total due" in ll:
                     amounts = re.findall(r"\$[\d,]+\.?\d*", line)
