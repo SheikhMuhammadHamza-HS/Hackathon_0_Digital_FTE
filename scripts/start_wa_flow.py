@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.config.logging_config import get_logger
 from src.watchers.whatsapp_watcher import WhatsAppWatcher
 from src.watchers.approval_watcher import ApprovalWatcher
+from ai_employee.utils.file_locker import FileLocker
 
 logger = get_logger("WhatsAppFlow")
 
@@ -32,6 +33,9 @@ async def run_wa_flow():
     wa_watcher = WhatsAppWatcher(poll_interval=poll_interval, headless=False)
     # Initialize Approval Execution (Handling outgoing)
     approval_watcher = ApprovalWatcher(poll_interval=app_poll_interval)
+    
+    agent_id = os.getenv("AGENT_ID", "wa_worker_01")
+    locker = FileLocker(Path("./Vault"), agent_id)
 
     # CRITICAL: Since we want to use the same browser, we must share the page instance
     # The WhatsAppSender in approval_watcher.executor needs to know about wa_watcher's page
@@ -67,14 +71,24 @@ async def run_wa_flow():
             # to keep everything in one async context and share the browser page.
             for path in approval_watcher.approved_dir.iterdir():
                 if path.is_file() and path not in approval_watcher.seen:
-                    content = path.read_text(encoding='utf-8').lower()
+                    claimed_path = locker.claim_file(path)
+                    if not claimed_path:
+                        approval_watcher.seen.add(path)
+                        continue
+                        
+                    content = claimed_path.read_text(encoding='utf-8').lower()
                     if "platform: whatsapp" in content:
-                        print(f"[{ts}] 📱 Sending Approved WhatsApp Message: {path.name}")
+                        print(f"[{ts}] 📱 Sending Approved WhatsApp Message: {claimed_path.name}")
                         approval_watcher.seen.add(path)
                         # This uses the executor which now has the shared wa_watcher._page
-                        approval_watcher._process_file(path)
+                        approval_watcher._process_file(claimed_path)
+                        
+                        # Mark as done
+                        locker.release_to_done(claimed_path)
                         # Brief wait after sending to avoid browser freezing
                         await asyncio.sleep(2)
+                    else:
+                        locker.release_to_folder(claimed_path, "Approved")
 
             # Wait for next cycle (default 60s)
             await asyncio.sleep(poll_interval)

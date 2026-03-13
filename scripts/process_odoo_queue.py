@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from ai_employee.integrations.odoo_client import get_odoo_client
+from ai_employee.utils.file_locker import FileLocker
 
 async def process_odoo_queue():
     load_dotenv()
@@ -31,6 +32,10 @@ async def process_odoo_queue():
 
     print(f"📦 Found {len(triggers)} pending triggers. Initializing Odoo connection...")
     
+    # Initialize Platinum Tier File Locker
+    agent_id = os.getenv("AGENT_ID", "odoo_worker_01")
+    locker = FileLocker(Path("./Vault"), agent_id)
+    
     client = get_odoo_client()
     try:
         await client.initialize()
@@ -49,7 +54,14 @@ async def process_odoo_queue():
 
         for trigger in triggers:
             print(f"\n[SYNCING] {trigger.name}...")
-            content = trigger.read_text(encoding='utf-8')
+            
+            # --- PLATINUM TIER LOCKING ---
+            claimed_trigger = locker.claim_file(trigger)
+            if not claimed_trigger:
+                print(f"  ⏭️ Skipped: {trigger.name} claimed by another agent.")
+                continue
+            
+            content = claimed_trigger.read_text(encoding='utf-8')
             
             # Extract data from the trigger file using Regex
             client_match = re.search(r"\*\*Client:\*\* (.*)", content)
@@ -94,10 +106,12 @@ async def process_odoo_queue():
             result = await client.create_invoice(invoice_data)
             print(f"  ✅ SUCCESS: Odoo Invoice Generated (ID: {result['id']})")
             
-            # 3. Archive the trigger
-            archive_path = archive_dir / trigger.name
-            trigger.rename(archive_path)
-            print(f"  📁 Trigger archived to {archive_path}")
+            # 3. Archive the trigger securely
+            archived = locker.release_to_folder(claimed_trigger, "Odoo/Archive")
+            if archived:
+                print(f"  📁 Trigger archived to {archived}")
+            else:
+                print(f"  ❌ Failed to archive {claimed_trigger.name}")
 
         await client.shutdown()
         
