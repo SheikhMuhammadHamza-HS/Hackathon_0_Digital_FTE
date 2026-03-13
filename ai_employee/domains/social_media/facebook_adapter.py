@@ -168,6 +168,25 @@ class FacebookAdapter(SocialMediaAdapter):
             logger.error(f"Failed to get Facebook engagement stats: {e}")
             return {}
 
+    async def get_recent_posts(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """Fetch recent posts from the page feed."""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self._base_url}/{self._page_id}/feed",
+                    params={
+                        "limit": limit,
+                        "fields": "id,message,created_time",
+                        "access_token": self._access_token
+                    }
+                )
+                if response.status_code == 200:
+                    return response.json().get("data", [])
+            return []
+        except Exception as e:
+            logger.error(f"Failed to fetch recent Facebook posts: {e}")
+            return []
+
     def supports_content_type(self, content_type: str) -> bool:
         """Check if Facebook supports the content type."""
         supported_types = ['text', 'image', 'video', 'link']
