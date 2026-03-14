@@ -29,6 +29,11 @@ async def run_wa_flow():
     print("="*70)
     print("Keep the browser window open and scan QR if needed.\n")
 
+    platinum_mode = os.getenv("PLATINUM_MODE", "local").lower()
+    print(f"🌍 Current PLATINUM_MODE: {platinum_mode.upper()}")
+    if platinum_mode == "cloud":
+        print("☁️ Cloud node will only monitor INBOX. Sending is restricted to local node.")
+    
     # Initialize Watcher (Handling incoming)
     wa_watcher = WhatsAppWatcher(poll_interval=poll_interval, headless=False)
     # Initialize Approval Execution (Handling outgoing)
@@ -69,26 +74,27 @@ async def run_wa_flow():
             # --- 2. Watch for APPROVED drafts to SEND ---
             # Instead of calling approval_watcher.start(), we poll it here manually
             # to keep everything in one async context and share the browser page.
-            for path in approval_watcher.approved_dir.iterdir():
-                if path.is_file() and path not in approval_watcher.seen:
-                    claimed_path = locker.claim_file(path)
-                    if not claimed_path:
-                        approval_watcher.seen.add(path)
-                        continue
-                        
-                    content = claimed_path.read_text(encoding='utf-8').lower()
-                    if "platform: whatsapp" in content:
-                        print(f"[{ts}] 📱 Sending Approved WhatsApp Message: {claimed_path.name}")
-                        approval_watcher.seen.add(path)
-                        # This uses the executor which now has the shared wa_watcher._page
-                        approval_watcher._process_file(claimed_path)
-                        
-                        # Mark as done
-                        locker.release_to_done(claimed_path)
-                        # Brief wait after sending to avoid browser freezing
-                        await asyncio.sleep(2)
-                    else:
-                        locker.release_to_folder(claimed_path, "Approved")
+            if platinum_mode == "local":
+                for path in approval_watcher.approved_dir.iterdir():
+                    if path.is_file() and path not in approval_watcher.seen:
+                        claimed_path = locker.claim_file(path)
+                        if not claimed_path:
+                            approval_watcher.seen.add(path)
+                            continue
+                            
+                        content = claimed_path.read_text(encoding='utf-8').lower()
+                        if "platform: whatsapp" in content:
+                            print(f"[{ts}] 📱 Sending Approved WhatsApp Message: {claimed_path.name}")
+                            approval_watcher.seen.add(path)
+                            # This uses the executor which now has the shared wa_watcher._page
+                            approval_watcher._process_file(claimed_path)
+                            
+                            # Mark as done
+                            locker.release_to_done(claimed_path)
+                            # Brief wait after sending to avoid browser freezing
+                            await asyncio.sleep(2)
+                        else:
+                            locker.release_to_folder(claimed_path, "Approved")
 
             # Wait for next cycle (default 60s)
             await asyncio.sleep(poll_interval)

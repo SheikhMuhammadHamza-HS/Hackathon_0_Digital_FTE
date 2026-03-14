@@ -24,6 +24,11 @@ async def run_fb_flow():
     print("1. MONITORING : Watch for Meta Page Mentions/Tags")
     print("2. POSTING    : Scheduled/Approved drafts posted to Feed")
     print("="*70)
+    
+    platinum_mode = os.getenv("PLATINUM_MODE", "local").lower()
+    print(f"🌍 Current PLATINUM_MODE: {platinum_mode.upper()}")
+    if platinum_mode == "cloud":
+        print("☁️ Cloud node will only monitor. Posting is restricted to local node.")
     print("Press Ctrl+C to stop Facebook Flow.\n")
 
     agent_id = os.getenv("AGENT_ID", "fb_worker_01")
@@ -34,25 +39,26 @@ async def run_fb_flow():
         while True:
             ts = time.strftime("%H:%M:%S")
             # --- 1. Identify and process Facebook Actions from Approved folder ---
-            for path in approval_watcher.approved_dir.iterdir():
-                if path.is_file() and path not in approval_watcher.seen:
-                    # Skip if already claimed by someone else
-                    claimed_path = locker.claim_file(path)
-                    if not claimed_path:
-                        approval_watcher.seen.add(path) # Mark seen so we don't try again
-                        continue
-
-                    content = claimed_path.read_text(encoding='utf-8').lower()
-                    if "platform: facebook" in content:
-                        print(f"[{ts}] 🔵 Facebook Post Detected: {claimed_path.name}")
-                        approval_watcher.seen.add(path) # Add original path to seen
-                        approval_watcher._process_file(claimed_path)
-                        
-                        # Move to Done folder after processing
-                        locker.release_to_done(claimed_path)
-                    else:
-                        # If not FB, release back to Approved for other agents
-                        locker.release_to_folder(claimed_path, "Approved")
+            if platinum_mode == "local":
+                for path in approval_watcher.approved_dir.iterdir():
+                    if path.is_file() and path not in approval_watcher.seen:
+                        # Skip if already claimed by someone else
+                        claimed_path = locker.claim_file(path)
+                        if not claimed_path:
+                            approval_watcher.seen.add(path) # Mark seen so we don't try again
+                            continue
+    
+                        content = claimed_path.read_text(encoding='utf-8').lower()
+                        if "platform: facebook" in content:
+                            print(f"[{ts}] 🔵 Facebook Post Detected: {claimed_path.name}")
+                            approval_watcher.seen.add(path) # Add original path to seen
+                            approval_watcher._process_file(claimed_path)
+                            
+                            # Move to Done folder after processing
+                            locker.release_to_done(claimed_path)
+                        else:
+                            # If not FB, release back to Approved for other agents
+                            locker.release_to_folder(claimed_path, "Approved")
 
             # --- 2. Optional: Pull mentions or stats from API ---
             # (Mentions pulling logic would go here)

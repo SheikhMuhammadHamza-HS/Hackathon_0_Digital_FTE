@@ -75,6 +75,16 @@ class EnvironmentManager:
             example="false"
         ))
 
+        # Platinum Tier Options
+        self.add_rule(ValidationRule(
+            name="PLATINUM_MODE",
+            required=False,
+            default="local",
+            validator=self._validate_platinum_mode,
+            description="Agent operating mode (local or cloud) for Platinum Dual Zone",
+            example="cloud"
+        ))
+
         # Security
         self.add_rule(ValidationRule(
             name="SECRET_KEY",
@@ -367,6 +377,26 @@ class EnvironmentManager:
         }
 
         return env_mapping.get(value, value)
+
+    def _validate_platinum_mode(self, value: str) -> str:
+        """Validate platinum dual-zone mode.
+
+        Args:
+            value: Mode name
+
+        Returns:
+            Validated mode name
+
+        Raises:
+            ValueError: If invalid mode
+        """
+        valid_modes = ["local", "cloud"]
+        value = value.lower()
+
+        if value not in valid_modes:
+            raise ValueError(f"Must be one of: {', '.join(valid_modes)}")
+
+        return value
 
     def _validate_boolean(self, value: str) -> bool:
         """Validate boolean value.

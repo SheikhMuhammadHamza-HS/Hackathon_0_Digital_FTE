@@ -146,6 +146,7 @@ class AppConfig:
     debug: bool = False
     api_host: str = "localhost"
     api_port: int = 8000
+    platinum_mode: str = "local"
 
     # Data retention
     data_retention_days: int = 730
@@ -231,6 +232,7 @@ class ConfigManager:
             debug=os.getenv("DEBUG", "false").lower() == "true",
             api_host=os.getenv("API_HOST", "localhost"),
             api_port=int(os.getenv("API_PORT", "8000")),
+            platinum_mode=os.getenv("PLATINUM_MODE", "local").lower(),
             data_retention_days=int(os.getenv("DATA_RETENTION_DAYS", "730")),
             temp_file_retention_days=int(os.getenv("TEMP_FILE_RETENTION_DAYS", "7")),
             approval_timeout_hours=int(os.getenv("APPROVAL_TIMEOUT_HOURS", "4")),

@@ -20,6 +20,13 @@ async def process_odoo_queue():
     print("🚀 ODOO QUEUE PROCESSOR — SYNCING TRIGGERS TO ERP")
     print("="*70)
     
+    platinum_mode = os.getenv("PLATINUM_MODE", "local").lower()
+    if platinum_mode == "cloud":
+        print("☁️ Running in PLATINUM_MODE=cloud. Odoo processing is skipped on the cloud node.")
+        print("   Local node will handle Odoo sync when turned on.")
+        return
+        
+    
     trigger_dir = Path("./Vault/Odoo/Triggers")
     archive_dir = Path("./Vault/Odoo/Archive")
     archive_dir.mkdir(parents=True, exist_ok=True)
