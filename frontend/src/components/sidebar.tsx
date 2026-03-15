@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { logout } from "@/services/api";
 import { 
   LayoutDashboard, 
   Mail, 
@@ -12,7 +14,8 @@ import {
   Cloud, 
   ScrollText,
   Settings,
-  Circle
+  Circle,
+  LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +38,14 @@ const systemStatus = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/login");
+  };
+
+  if (pathname === "/login") return null;
 
   return (
     <div className="flex flex-col h-full w-64 bg-[#09090b] border-r border-zinc-800/50">
@@ -74,19 +85,29 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="p-6 mt-auto border-t border-zinc-800/50">
-        <h3 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-4">System Status</h3>
-        <div className="space-y-3">
-          {systemStatus.map((s) => (
-            <div key={s.name} className="flex items-center justify-between text-[11px]">
-              <div className="flex items-center gap-2 text-zinc-400">
-                <div className={cn("w-1.5 h-1.5 rounded-full shadow-sm", s.color)} />
-                {s.name}:
+      <div className="p-4 mt-auto border-t border-zinc-800/50 space-y-4">
+        <div>
+          <h3 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-4">System Status</h3>
+          <div className="space-y-3">
+            {systemStatus.map((s) => (
+              <div key={s.name} className="flex items-center justify-between text-[11px]">
+                <div className="flex items-center gap-2 text-zinc-400">
+                  <div className={cn("w-1.5 h-1.5 rounded-full shadow-sm", s.color)} />
+                  {s.name}:
+                </div>
+                <span className="font-mono text-zinc-300 uppercase">{s.status}</span>
               </div>
-              <span className="font-mono text-zinc-300 uppercase">{s.status}</span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
+        
+        <button 
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-zinc-500 hover:text-red-400 hover:bg-red-500/5 transition-all duration-200"
+        >
+          <LogOut className="w-4 h-4" />
+          Logout Session
+        </button>
       </div>
     </div>
   );
