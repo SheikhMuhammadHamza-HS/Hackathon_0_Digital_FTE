@@ -9,6 +9,7 @@ import {
   RefreshCcw 
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { cn } from "../lib/utils";
 import { StatCard } from "../components/stat-card";
 import { ActivityChart } from "../components/activity-chart";
 import { useState, useEffect } from "react";
