@@ -28,7 +28,11 @@ async def run_unified_watcher():
     print(f"1. GMAIL    : Polling every {poll_interval}s (Inbox -> Needs_Action)")
     print(f"2. APPROVAL : Polling every {app_poll_interval}s (Approved -> Done/Sent)")
     print(f"3. ODOO     : Syncing triggers to ERP automatically")
+    
+    platinum_mode = os.getenv("PLATINUM_MODE", "local").lower()
+    print(f"🌍 PLATINUM MODE: {platinum_mode.upper()}")
     print("="*70)
+    
     print("Press Ctrl+C to stop the system.\n")
 
     try:
@@ -46,13 +50,18 @@ async def run_unified_watcher():
                 print(f"    ✨ Found {len(gmail_found)} new email(s). AI drafting started.")
 
             # --- 2. APPROVAL MONITOR (Action Execution) ---
-            ts_app = time.strftime("%H:%M:%S")
-            for path in approval_watcher.approved_dir.iterdir():
-                if path.is_file() and path not in approval_watcher.seen:
-                    print(f"[{ts_app}] ✅ APPROVED FILE DETECTED: {path.name}")
-                    approval_watcher.seen.add(path)
-                    # This executes the action (Email/Odoo Trigger)
-                    approval_watcher._process_file(path)
+            if platinum_mode == "local":
+                ts_app = time.strftime("%H:%M:%S")
+                for path in approval_watcher.approved_dir.iterdir():
+                    if path.is_file() and path not in approval_watcher.seen:
+                        print(f"[{ts_app}] ✅ APPROVED FILE DETECTED: {path.name}")
+                        approval_watcher.seen.add(path)
+                        # This executes the action (Email/Odoo Trigger)
+                        approval_watcher._process_file(path)
+            else:
+                # Cloud node doesn't process approvals
+                pass
+                
             
             # --- 3. ODOO QUEUE (Sync Triggers to ERP) ---
             await process_odoo_queue()

@@ -38,6 +38,14 @@ print(f"  Approved folder : {APPROVED_DIR.resolve()}")
 print(f"  Done folder     : {DONE_DIR.resolve()}")
 print("=" * 65)
 
+PLATINUM_MODE = os.getenv("PLATINUM_MODE", "local").lower()
+if PLATINUM_MODE == "cloud":
+    print("\n☁️ [PLATINUM] Running in CLOUD mode.")
+    print("   Execution of Approved items is RESTRICTED to the Local Node.")
+    print("   Please run this script on your Local machine to process approvals.")
+    sys.exit(0)
+    
+
 approved_files = list(APPROVED_DIR.glob("*.md"))
 
 if not approved_files:

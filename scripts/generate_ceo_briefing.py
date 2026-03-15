@@ -14,26 +14,34 @@ async def generate_ceo_briefing():
     print("📋 Generating AI Employee Weekly CEO Briefing...")
     
     # Paths
-    done_path = Path("./Done")
-    logs_path = Path("./Logs")
+    done_path = Path("./Vault/Done")
+    done_files = list(done_path.glob("*.md"))
+    done_count = len(done_files)
     vault_ledger = Path("./Vault/Invoice_Ledger.md")
     
-    # 1. Scan Productivity (Done folder)
-    done_files = list(done_path.glob("*.md"))
     
-    # 2. Key Metrics
-    tasks_completed = len(done_files)
     invoices_processed = 0
     total_invoice_value = 0.0
+    confirmed_revenue = 0.0
     
     if vault_ledger.exists():
         ledger_content = vault_ledger.read_text(encoding='utf-8')
-        # Simple extraction of numeric totals from ledger table
         import re
         amounts = re.findall(r"\$(\d+[\d,]*\.\d+)", ledger_content)
         for amt in amounts:
             total_invoice_value += float(amt.replace(",", ""))
         invoices_processed = len(amounts)
+
+    # 3. Scan Bank Transactions for Revenue
+    bank_path = Path("./Vault/Bank_Transactions.md")
+    if bank_path.exists():
+        bank_content = bank_path.read_text(encoding='utf-8')
+        import re
+        # Find amounts in format | $1500.0 |
+        bank_amounts = re.findall(r"\|\s*\$(\d+[\d,]*\.?\d*)\s*\|", bank_content)
+        for amt in bank_amounts:
+            confirmed_revenue += float(amt.replace(",", ""))
+    
 
     # 3. Briefing Content (Markdown)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -41,10 +49,12 @@ async def generate_ceo_briefing():
 **Generated on:** {timestamp}
 
 ## 🚀 Performance Overview
-- **Total Tasks Completed:** {tasks_completed}
+- **Total Tasks Completed:** {done_count}
 - **Invoices Processed:** {invoices_processed}
-- **Revenue Monitored/Submitted:** ${total_invoice_value:,.2f}
+- **Invoiced Value (Total):** ${total_invoice_value:,.2f}
+- **Bank Revenue (Confirmed):** ${confirmed_revenue:,.2f}
 - **Active Platforms:** Facebook, Odoo ERP, Gmail
+    
 
 ## 📊 Detail Activity Log (Recent 5 Tasks)
 """
@@ -68,11 +78,19 @@ async def generate_ceo_briefing():
 *Report generated automatically by Hamza's Digital FTE AI System.*
 """
     
-    # Save to Dashboard.md
-    report_file = Path("./Dashboard.md")
-    report_file.write_text(briefing, encoding='utf-8')
+    # Save to Dashboard.md (Local) or Signal folder (Cloud)
+    platinum_mode = os.getenv("PLATINUM_MODE", "local").lower()
+    if platinum_mode == "cloud":
+        updates_dir = Path("./Vault/Updates")
+        updates_dir.mkdir(parents=True, exist_ok=True)
+        report_file = updates_dir / f"briefing_signal_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+        report_file.write_text(briefing, encoding='utf-8')
+        print(f"☁️ [CLOUD] Briefing signal written to {report_file}")
+    else:
+        report_file = Path("./Dashboard.md")
+        report_file.write_text(briefing, encoding='utf-8')
+        print(f"✅ CEO Briefing generated at {report_file.resolve()}")
     
-    print(f"✅ CEO Briefing generated at {report_file.resolve()}")
     print("-" * 50)
     print(briefing)
 
