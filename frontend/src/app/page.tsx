@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { 
   Mail, 
   MessageSquare, 
@@ -38,6 +39,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const router = useRouter();
 
   const loadData = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -60,10 +62,17 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    // Check if user is authenticated
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
     loadData();
     const interval = setInterval(() => loadData(true), 30000); // Auto refresh every 30s
     return () => clearInterval(interval);
-  }, []);
+  }, [router]);
 
   if (loading && !data) {
     return (
