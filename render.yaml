@@ -1,0 +1,30 @@
+services:
+  - type: worker
+    name: ai-employee-platinum
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/cloud_startup.py
+    envVars:
+      - key: PLATINUM_MODE
+        value: cloud
+      - key: SYNC_INTERVAL
+        value: 300
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: SECRET_KEY
+        from_secret: SECRET_KEY
+      - key: JWT_SECRET_KEY
+        from_secret: JWT_SECRET_KEY
+      - key: GMAIL_TOKEN
+        from_secret: GMAIL_TOKEN
+      - key: OPENAI_API_KEY
+        from_secret: OPENAI_API_KEY
+
+  - type: web
+    name: ai-employee-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn ai_employee.api.app:app
+    envVars:
+      - key: PORT
+        value: 8000
