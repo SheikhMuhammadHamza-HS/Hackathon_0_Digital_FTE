@@ -9,8 +9,8 @@ import {
   RefreshCcw 
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { StatCard } from "@/components/stat-card";
-import { ActivityChart } from "@/components/activity-chart";
+import { StatCard } from "../components/stat-card";
+import { ActivityChart } from "../components/activity-chart";
 import { useState, useEffect } from "react";
 
 const systemRows = [
