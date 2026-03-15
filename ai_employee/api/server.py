@@ -154,16 +154,16 @@ class BottleneckAnalysisResponse(BaseModel):
 # Authentication Endpoints
 
 @app.post("/api/v1/auth/login")
-async def login(username: str, password: str):
+async def login(email: str, password: str):
     """Authenticate user and return token."""
     try:
-        user = auth_manager.authenticate(username, password)
+        user = auth_manager.authenticate(email, password)
         if not user:
             security_middleware.log_security_event(
                 "failed_login",
                 ThreatLevel.MEDIUM,
                 "unknown",
-                details={"username": username}
+                details={"email": email}
             )
             raise HTTPException(
                 status_code=401,
@@ -181,17 +181,18 @@ async def login(username: str, password: str):
         audit_logger.log(
             event_type="login",
             user_id=user.user_id,
-            details={"username": username},
+            details={"email": email},
             ip_address="unknown"  # Would extract from request
         )
 
         return {
             "access_token": token,
             "token_type": "bearer",
-            "expires_in": 3600,
+            "expires_in": 3600, # Assuming default expiry from token_manager.create_token
             "user": {
                 "id": user.user_id,
-                "username": user.username,
+                "username": user.username, # user.username will now store the email
+                "full_name": user.full_name,
                 "level": user.level.value
             }
         }
@@ -201,6 +202,39 @@ async def login(username: str, password: str):
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
         raise HTTPException(status_code=500, detail="Authentication failed")
+
+
+@app.post("/api/v1/auth/register")
+async def register(email: str, password: str, full_name: str):
+    """Register a new user."""
+    try:
+        # Prevent duplicate emails (using them as usernames internally)
+        if any(u.username == email for u in auth_manager.users.values()):
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        # Create user using email as the username internally
+        user = auth_manager.create_user(email, password, SecurityLevel.USER, email=email, full_name=full_name)
+        
+        audit_logger.log(
+            event_type="user_registered",
+            user_id=user.user_id,
+            details={"email": email},
+            ip_address="unknown"
+        )
+        
+        return {
+            "message": "User registered successfully",
+            "user": {
+                "id": user.user_id,
+                "username": user.username,
+                "level": user.level.value
+            }
+        }
+    except AuthenticationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Registration error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Registration failed")
 
 
 @app.post("/api/v1/auth/logout")

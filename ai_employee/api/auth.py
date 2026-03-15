@@ -42,11 +42,15 @@ class User:
         user_id: str,
         username: str,
         level: SecurityLevel,
+        email: Optional[str] = None,
+        full_name: Optional[str] = None,
         permissions: List[str] = None
     ):
         self.user_id = user_id
         self.username = username
         self.level = level
+        self.email = email
+        self.full_name = full_name
         self.permissions = permissions or []
         self.last_activity = datetime.now()
 
@@ -60,13 +64,15 @@ class AuthManager:
         self.sessions: Dict[str, User] = {}
 
         # Create default admin user
-        self.create_user("admin", "admin123", SecurityLevel.ADMIN)
+        self.create_user("admin", "admin123", SecurityLevel.ADMIN, email="admin@vaultos.ai", full_name="System Administrator")
 
     def create_user(
         self,
         username: str,
         password: str,
         level: SecurityLevel,
+        email: Optional[str] = None,
+        full_name: Optional[str] = None,
         permissions: List[str] = None
     ) -> User:
         """Create a new user."""
@@ -80,6 +86,8 @@ class AuthManager:
             user_id=user_id,
             username=username,
             level=level,
+            email=email,
+            full_name=full_name,
             permissions=permissions or []
         )
 
