@@ -1,16 +1,21 @@
 "use client";
 
 import { 
-  Calculator, 
   ArrowUpRight, 
   ArrowDownRight, 
   FileText,
   DollarSign,
   Briefcase,
-  History,
   ExternalLink
 } from "lucide-react";
 import { ActivityChart } from "@/components/activity-chart";
+
+interface FinanceCardProps {
+  title: string;
+  value: string;
+  change: string;
+  trend: "up" | "down";
+}
 
 const invoices = [
   { id: "INV/2026/004", client: "Nexus Labs", amount: "$3,400.00", status: "Paid", date: "Mar 12" },
@@ -90,7 +95,7 @@ export default function AccountingPage() {
   );
 }
 
-function FinanceCard({ title, value, change, trend }: any) {
+function FinanceCard({ title, value, change, trend }: FinanceCardProps) {
   return (
     <div className="bg-[#111113] border border-zinc-800/50 rounded-2xl p-6 glass">
       <p className="text-sm font-medium text-zinc-400">{title}</p>
