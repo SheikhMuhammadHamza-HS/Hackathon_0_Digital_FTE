@@ -8,7 +8,7 @@ import {
   Briefcase,
   ExternalLink
 } from "lucide-react";
-import { ActivityChart } from "../../components/activity-chart";
+import { ActivityChart } from "@/components/activity-chart";
 
 interface FinanceCardProps {
   title: string;
