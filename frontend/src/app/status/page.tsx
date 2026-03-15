@@ -1,13 +1,18 @@
 "use client";
 
 import { 
-  Cloud, 
   RefreshCcw, 
   Cpu, 
   Database, 
-  HardDrive,
-  Circle
+  HardDrive
 } from "lucide-react";
+
+interface UsageCardProps {
+  title: string;
+  value: string;
+  percentage: number;
+  icon: React.ElementType;
+}
 
 const processes = [
   { name: "cloud-orchestrator", status: "online", cpu: "0.1%", memory: "45 MB", restarts: 0 },
@@ -94,7 +99,7 @@ export default function CloudStatusPage() {
   );
 }
 
-function UsageCard({ title, value, percentage, icon: Icon }: any) {
+function UsageCard({ title, value, percentage, icon: Icon }: { title: string, value: string, percentage: number, icon: React.ElementType }) {
   return (
     <div className="bg-[#111113] border border-zinc-800/50 rounded-xl p-6 space-y-4">
       <div className="flex items-center justify-between">

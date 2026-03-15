@@ -9,6 +9,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 const approvals = [
   { 
@@ -111,6 +112,3 @@ export default function ApprovalsPage() {
   );
 }
 
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(" ");
-}
