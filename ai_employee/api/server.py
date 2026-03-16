@@ -33,8 +33,12 @@ from .auth import (
     require_level,
     SecurityLevel,
     auth_manager,
-    audit_logger
+    audit_logger,
+    AuthenticationError
 )
+from .database import get_db
+from sqlalchemy.orm import Session
+from .models import UserDB
 from .data_retention import router as retention_router
 from .gdpr import router as gdpr_router
 from .monitoring import router as monitoring_router
@@ -154,10 +158,10 @@ class BottleneckAnalysisResponse(BaseModel):
 # Authentication Endpoints
 
 @app.post("/api/v1/auth/login")
-async def login(email: str, password: str):
+async def login(email: str, password: str, db: Session = Depends(get_db)):
     """Authenticate user and return token."""
     try:
-        user = auth_manager.authenticate(email, password)
+        user = auth_manager.authenticate(db, email, password)
         if not user:
             security_middleware.log_security_event(
                 "failed_login",
@@ -179,19 +183,20 @@ async def login(email: str, password: str):
 
         # Log successful login
         audit_logger.log(
+            db=db,
             event_type="login",
             user_id=user.user_id,
             details={"email": email},
-            ip_address="unknown"  # Would extract from request
+            ip_address="unknown"
         )
 
         return {
             "access_token": token,
             "token_type": "bearer",
-            "expires_in": 3600, # Assuming default expiry from token_manager.create_token
+            "expires_in": 3600,
             "user": {
                 "id": user.user_id,
-                "username": user.username, # user.username will now store the email
+                "username": user.username,
                 "full_name": user.full_name,
                 "level": user.level.value
             }
@@ -205,17 +210,19 @@ async def login(email: str, password: str):
 
 
 @app.post("/api/v1/auth/register")
-async def register(email: str, password: str, full_name: str):
+async def register(email: str, password: str, full_name: str, db: Session = Depends(get_db)):
     """Register a new user."""
     try:
-        # Prevent duplicate emails (using them as usernames internally)
-        if any(u.username == email for u in auth_manager.users.values()):
+        # Prevent duplicate emails
+        existing_user = db.query(UserDB).filter(UserDB.username == email).first()
+        if existing_user:
             raise HTTPException(status_code=400, detail="Email already registered")
 
-        # Create user using email as the username internally
-        user = auth_manager.create_user(email, password, SecurityLevel.USER, email=email, full_name=full_name)
+        # Create user
+        user = auth_manager.create_user(db, email, password, SecurityLevel.USER, email=email, full_name=full_name)
         
         audit_logger.log(
+            db=db,
             event_type="user_registered",
             user_id=user.user_id,
             details={"email": email},
@@ -238,14 +245,13 @@ async def register(email: str, password: str, full_name: str):
 
 
 @app.post("/api/v1/auth/logout")
-async def logout(user: User = Depends(get_current_user)):
+async def logout(user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
     """Logout user and revoke token."""
     try:
-        # Get token from authorization header
-        # In a real implementation, you'd extract and revoke the specific token
         audit_logger.log(
+            db=db,
             event_type="logout",
-            user_id=user.user_id,
+            user_id=str(user.id) if hasattr(user, 'id') else user.user_id,
             details={},
             ip_address="unknown"
         )

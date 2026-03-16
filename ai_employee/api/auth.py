@@ -8,6 +8,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.requests import Request
 from fastapi.responses import Response
 import logging
+from passlib.context import CryptContext
+from .database import SessionLocal, engine
+from .models import UserDB, Base, AuditLogDB
+from sqlalchemy.orm import Session
 
 from ..utils.security import (
     SecurityMiddleware,
@@ -19,6 +23,12 @@ from ..utils.security import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Create tables
+Base.metadata.create_all(bind=engine)
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # HTTP Bearer scheme for token authentication
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -56,18 +66,31 @@ class User:
 
 
 class AuthManager:
-    """Authentication manager."""
+    """Authentication manager with Database support."""
 
     def __init__(self):
-        self.users: Dict[str, User] = {}
-        self.api_keys: Dict[str, User] = {}
-        self.sessions: Dict[str, User] = {}
+        # We'll use SessionLocal to create sessions for each request
+        # No more in-memory storage for persistent users
+        self.api_keys: Dict[str, UserDB] = {}
+        
+        # Verify if admin exists, if not create it
+        db = SessionLocal()
+        try:
+            admin = db.query(UserDB).filter(UserDB.username == "admin").first()
+            if not admin:
+                self.create_user(db, "admin", "admin123", SecurityLevel.ADMIN, email="admin@vaultos.ai", full_name="System Administrator")
+        finally:
+            db.close()
 
-        # Create default admin user
-        self.create_user("admin", "admin123", SecurityLevel.ADMIN, email="admin@vaultos.ai", full_name="System Administrator")
+    def get_password_hash(self, password):
+        return pwd_context.hash(password)
+
+    def verify_password(self, plain_password, hashed_password):
+        return pwd_context.verify(plain_password, hashed_password)
 
     def create_user(
         self,
+        db: Session,
         username: str,
         password: str,
         level: SecurityLevel,
@@ -75,51 +98,89 @@ class AuthManager:
         full_name: Optional[str] = None,
         permissions: List[str] = None
     ) -> User:
-        """Create a new user."""
+        """Create a new user in database."""
         # Validate password
         validation = input_validator.validate_password(password)
         if not validation["valid"]:
             raise AuthenticationError(f"Invalid password: {', '.join(validation['errors'])}")
 
-        user_id = f"user_{len(self.users) + 1}"
-        user = User(
-            user_id=user_id,
+        hashed_password = self.get_password_hash(password)
+        
+        db_user = UserDB(
             username=username,
-            level=level,
-            email=email,
+            email=email or username,
             full_name=full_name,
+            hashed_password=hashed_password,
+            level=level.value,
             permissions=permissions or []
         )
+        
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
 
-        # Store user (in production, store hashed password)
-        self.users[user_id] = user
+        return User(
+            user_id=str(db_user.id),
+            username=db_user.username,
+            level=SecurityLevel(db_user.level),
+            email=db_user.email,
+            full_name=db_user.full_name,
+            permissions=db_user.permissions
+        )
 
-        return user
+    def authenticate(self, db: Session, username: str, password: str) -> Optional[User]:
+        """Authenticate user with credentials from DB."""
+        db_user = db.query(UserDB).filter(UserDB.username == username).first() or \
+                  db.query(UserDB).filter(UserDB.email == username).first()
 
-    def authenticate(self, username: str, password: str) -> Optional[User]:
-        """Authenticate user with credentials."""
-        # Find user by username
-        user = next((u for u in self.users.values() if u.username == username), None)
-
-        if not user:
+        if not db_user:
             return None
 
-        # In production, verify hashed password
-        # For demo, accept any password for existing users
-        return user
+        if not self.verify_password(password, db_user.hashed_password):
+            return None
+        
+        # Update last activity
+        db_user.last_login = datetime.now()
+        db.commit()
+
+        return User(
+            user_id=str(db_user.id),
+            username=db_user.username,
+            level=SecurityLevel(db_user.level),
+            email=db_user.email,
+            full_name=db_user.full_name,
+            permissions=db_user.permissions
+        )
 
     def authenticate_api_key(self, api_key: str) -> Optional[User]:
         """Authenticate using API key."""
         return self.api_keys.get(api_key)
 
-    def get_user_by_token(self, token: str) -> Optional[User]:
-        """Get user from token."""
+    def get_user_by_id(self, db: Session, user_id: str) -> Optional[User]:
+        """Get user by ID."""
+        try:
+            db_user = db.query(UserDB).filter(UserDB.id == int(user_id)).first()
+            if not db_user:
+                return None
+            return User(
+                user_id=str(db_user.id),
+                username=db_user.username,
+                level=SecurityLevel(db_user.level),
+                email=db_user.email,
+                full_name=db_user.full_name,
+                permissions=db_user.permissions
+            )
+        except:
+            return None
+
+    def get_user_by_token(self, db: Session, token: str) -> Optional[User]:
+        """Get user from token using DB."""
         payload = security_middleware.token_manager.validate_token(token)
         if not payload:
             return None
 
         user_id = payload.get("user_id")
-        return self.users.get(user_id)
+        return self.get_user_by_id(db, user_id)
 
     def generate_api_key(self, user: User) -> str:
         """Generate API key for user."""
@@ -133,7 +194,8 @@ auth_manager = AuthManager()
 
 
 async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme)
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
+    db: Session = Depends(get_db)
 ) -> User:
     """Get current authenticated user."""
     if not credentials:
@@ -144,7 +206,7 @@ async def get_current_user(
         )
 
     # Validate token
-    user = auth_manager.get_user_by_token(credentials.credentials)
+    user = auth_manager.get_user_by_token(db, credentials.credentials)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -152,20 +214,18 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Update last activity
-    user.last_activity = datetime.now()
-
     return user
 
 
 async def get_optional_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme)
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
+    db: Session = Depends(get_db)
 ) -> Optional[User]:
     """Get current user if authenticated, otherwise None."""
     if not credentials:
         return None
 
-    return auth_manager.get_user_by_token(credentials.credentials)
+    return auth_manager.get_user_by_token(db, credentials.credentials)
 
 
 def require_level(level: SecurityLevel):
@@ -300,62 +360,73 @@ class SecurityMiddlewareHTTP(BaseHTTPMiddleware):
 
 
 class AuditLogger:
-    """Audit logging for security events."""
+    """Audit logging for security events with Database support."""
 
     def __init__(self):
-        self.audit_log: List[Dict[str, Any]] = []
+        # Database session will be provided at log time or use SessionLocal
+        pass
 
     def log(
         self,
+        db: Session,
         event_type: str,
         user_id: Optional[str],
         details: Dict[str, Any],
         ip_address: str,
         user_agent: Optional[str] = None
     ):
-        """Log an audit event."""
-        event = {
-            "timestamp": datetime.now().isoformat(),
-            "event_type": event_type,
-            "user_id": user_id,
-            "ip_address": ip_address,
-            "user_agent": user_agent,
-            "details": details
-        }
-
-        self.audit_log.append(event)
+        """Log an audit event to DB."""
+        try:
+            log_entry = AuditLogDB(
+                event_type=event_type,
+                user_id=user_id,
+                details=details,
+                ip_address=ip_address
+            )
+            db.add(log_entry)
+            db.commit()
+        except Exception as e:
+            logger.error(f"Failed to log audit event: {str(e)}")
 
         # Also log to standard logger
-        logger.info(f"Audit: {event_type}", extra={"audit_event": event})
+        logger.info(f"Audit: {event_type} (user_id={user_id})")
 
-    def get_user_activity(self, user_id: str, limit: int = 100) -> List[Dict[str, Any]]:
-        """Get activity for a specific user."""
+    def get_user_activity(self, db: Session, user_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get activity for a specific user from DB."""
+        logs = db.query(AuditLogDB).filter(AuditLogDB.user_id == user_id).order_by(AuditLogDB.timestamp.desc()).limit(limit).all()
         return [
-            event for event in self.audit_log
-            if event["user_id"] == user_id
-        ][-limit:]
+            {
+                "timestamp": log.timestamp.isoformat(),
+                "event_type": log.event_type,
+                "user_id": log.user_id,
+                "ip_address": log.ip_address,
+                "details": log.details
+            } for log in logs
+        ]
 
     def get_security_events(
         self,
+        db: Session,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None
     ) -> List[Dict[str, Any]]:
-        """Get security events within date range."""
-        filtered = self.audit_log
-
+        """Get security events from DB within date range."""
+        query = db.query(AuditLogDB)
         if start_date:
-            filtered = [
-                e for e in filtered
-                if datetime.fromisoformat(e["timestamp"]) >= start_date
-            ]
-
+            query = query.filter(AuditLogDB.timestamp >= start_date)
         if end_date:
-            filtered = [
-                e for e in filtered
-                if datetime.fromisoformat(e["timestamp"]) <= end_date
-            ]
-
-        return filtered
+            query = query.filter(AuditLogDB.timestamp <= end_date)
+            
+        logs = query.order_by(AuditLogDB.timestamp.desc()).all()
+        return [
+            {
+                "timestamp": log.timestamp.isoformat(),
+                "event_type": log.event_type,
+                "user_id": log.user_id,
+                "ip_address": log.ip_address,
+                "details": log.details
+            } for log in logs
+        ]
 
 
 # Global audit logger
