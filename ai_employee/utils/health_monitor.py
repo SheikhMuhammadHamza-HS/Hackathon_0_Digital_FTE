@@ -36,12 +36,12 @@ class HealthCheckConfig:
 
 
 class HealthStatus(IntEnum):
-    """Health status levels (Ordered by severity)."""
-    HEALTHY = 4
-    DEGRADED = 3
-    UNHEALTHY = 2
-    CRITICAL = 1
+    """Health status levels (Ordered by severity: higher is worse)."""
     UNKNOWN = 0
+    HEALTHY = 1
+    DEGRADED = 2
+    UNHEALTHY = 3
+    CRITICAL = 4
 
 
 class CheckType(Enum):
@@ -603,6 +603,8 @@ class HealthMonitor:
         check.metrics.clear()
 
         endpoint_config = check.metadata.get("endpoint", {})
+        # Tables are created via proper migration or app startup, not module level
+        # Base.metadata.create_all(bind=engine)
         url = endpoint_config.get("url")
         method = endpoint_config.get("method", "GET")
         headers = endpoint_config.get("headers", {})
