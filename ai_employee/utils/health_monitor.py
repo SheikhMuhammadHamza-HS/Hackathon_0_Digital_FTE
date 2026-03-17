@@ -35,13 +35,13 @@ class HealthCheckConfig:
     enable_service_checks: bool = True
 
 
-class HealthStatus(Enum):
-    """Health status levels."""
-    HEALTHY = "healthy"
-    DEGRADED = "degraded"
-    UNHEALTHY = "unhealthy"
-    CRITICAL = "critical"
-    UNKNOWN = "unknown"
+class HealthStatus(IntEnum):
+    """Health status levels (Ordered by severity)."""
+    HEALTHY = 4
+    DEGRADED = 3
+    UNHEALTHY = 2
+    CRITICAL = 1
+    UNKNOWN = 0
 
 
 class CheckType(Enum):
