@@ -12,29 +12,39 @@ services:
         value: 300
       - key: PYTHONUNBUFFERED
         value: "1"
-      - key: SECRET_KEY
-        from_secret: SECRET_KEY
-      - key: JWT_SECRET_KEY
-        from_secret: JWT_SECRET_KEY
-      - key: GMAIL_TOKEN
-        from_secret: GMAIL_TOKEN
-      - key: OPENAI_API_KEY
-        from_secret: OPENAI_API_KEY
       - key: DATABASE_URL
-        from_secret: DATABASE_URL
+        fromParam: database_url
+      - key: SECRET_KEY
+        fromParam: secret_key
+      - key: JWT_SECRET_KEY
+        fromParam: jwt_secret_key
+      - key: GMAIL_TOKEN
+        fromParam: gmail_token
+      - key: OPENAI_API_KEY
+        fromParam: openai_api_key
 
   # 2. Web Service (FastAPI Backend)
   - type: web
     name: ai-employee-api
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn ai_employee.api.server:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
+    startCommand: gunicorn ai_employee.api.server:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
     envVars:
-      - key: PORT
-        value: 8000
       - key: DATABASE_URL
-        from_secret: DATABASE_URL
+        fromParam: database_url
       - key: SECRET_KEY
-        from_secret: SECRET_KEY
+        fromParam: secret_key
       - key: JWT_SECRET_KEY
-        from_secret: JWT_SECRET_KEY
+        fromParam: jwt_secret_key
+
+parameters:
+  - key: database_url
+    description: Neon PostgreSQL Connection URL (postgresql://...)
+  - key: secret_key
+    description: Main Application Secret Key
+  - key: jwt_secret_key
+    description: JWT Signing Secret Key
+  - key: gmail_token
+    description: Google/Gmail API Token
+  - key: openai_api_key
+    description: OpenAI API Key for AI features
