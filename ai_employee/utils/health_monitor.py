@@ -10,7 +10,7 @@ import psutil
 import json
 import time
 from datetime import datetime, timezone, timedelta
-from enum import Enum
+from enum import Enum, IntEnum
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Callable, Union, Tuple
 from dataclasses import dataclass, field, asdict
