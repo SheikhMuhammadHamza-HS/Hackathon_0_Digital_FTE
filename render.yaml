@@ -12,7 +12,16 @@ services:
         value: "300"
       - key: PYTHONUNBUFFERED
         value: "1"
-      - fromGroup: ai-employee-secrets
+      - key: DATABASE_URL
+        fromParameter: database_url
+      - key: SECRET_KEY
+        fromParameter: secret_key
+      - key: JWT_SECRET_KEY
+        fromParameter: jwt_secret_key
+      - key: GMAIL_TOKEN
+        fromParameter: gmail_token
+      - key: OPENAI_API_KEY
+        fromParameter: openai_api_key
 
   # 2. Web Service (FastAPI Backend)
   - type: web
@@ -22,13 +31,21 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn ai_employee.api.server:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
     envVars:
-      - fromGroup: ai-employee-secrets
-
-envVarGroups:
-  - name: ai-employee-secrets
-    envVars:
       - key: DATABASE_URL
+        fromParameter: database_url
       - key: SECRET_KEY
+        fromParameter: secret_key
       - key: JWT_SECRET_KEY
-      - key: GMAIL_TOKEN
-      - key: OPENAI_API_KEY
+        fromParameter: jwt_secret_key
+
+parameters:
+  - key: database_url
+    description: Neon PostgreSQL URL (postgresql://...)
+  - key: secret_key
+    description: App Secret Key
+  - key: jwt_secret_key
+    description: JWT Secret Key
+  - key: gmail_token
+    description: Google/Gmail API Token
+  - key: openai_api_key
+    description: OpenAI API Key
