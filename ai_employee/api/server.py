@@ -56,6 +56,10 @@ app = FastAPI(
 )
 
 # Include routers
+@app.get("/health")
+async def root_health():
+    return {"status": "ok", "service": "AI Employee API", "timestamp": datetime.now().isoformat()}
+
 app.include_router(retention_router)
 app.include_router(gdpr_router)
 app.include_router(monitoring_router)
