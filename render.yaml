@@ -1,6 +1,7 @@
 services:
+  # 1. Background Worker (Platinum Sync & Watchers)
   - type: worker
-    name: ai-employee-platinum
+    name: ai-employee-worker
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: python scripts/cloud_startup.py
@@ -19,12 +20,21 @@ services:
         from_secret: GMAIL_TOKEN
       - key: OPENAI_API_KEY
         from_secret: OPENAI_API_KEY
+      - key: DATABASE_URL
+        from_secret: DATABASE_URL
 
+  # 2. Web Service (FastAPI Backend)
   - type: web
     name: ai-employee-api
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn ai_employee.api.app:app
+    startCommand: gunicorn ai_employee.api.server:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
     envVars:
       - key: PORT
         value: 8000
+      - key: DATABASE_URL
+        from_secret: DATABASE_URL
+      - key: SECRET_KEY
+        from_secret: SECRET_KEY
+      - key: JWT_SECRET_KEY
+        from_secret: JWT_SECRET_KEY
