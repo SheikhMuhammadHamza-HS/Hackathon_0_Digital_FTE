@@ -7,44 +7,28 @@ services:
     startCommand: python scripts/cloud_startup.py
     envVars:
       - key: PLATINUM_MODE
-        value: cloud
+        value: "cloud"
       - key: SYNC_INTERVAL
-        value: 300
+        value: "300"
       - key: PYTHONUNBUFFERED
         value: "1"
-      - key: DATABASE_URL
-        fromParam: database_url
-      - key: SECRET_KEY
-        fromParam: secret_key
-      - key: JWT_SECRET_KEY
-        fromParam: jwt_secret_key
-      - key: GMAIL_TOKEN
-        fromParam: gmail_token
-      - key: OPENAI_API_KEY
-        fromParam: openai_api_key
+      - fromGroup: ai-employee-secrets
 
   # 2. Web Service (FastAPI Backend)
   - type: web
     name: ai-employee-api
     env: python
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn ai_employee.api.server:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
     envVars:
-      - key: DATABASE_URL
-        fromParam: database_url
-      - key: SECRET_KEY
-        fromParam: secret_key
-      - key: JWT_SECRET_KEY
-        fromParam: jwt_secret_key
+      - fromGroup: ai-employee-secrets
 
-parameters:
-  - key: database_url
-    description: Neon PostgreSQL Connection URL (postgresql://...)
-  - key: secret_key
-    description: Main Application Secret Key
-  - key: jwt_secret_key
-    description: JWT Signing Secret Key
-  - key: gmail_token
-    description: Google/Gmail API Token
-  - key: openai_api_key
-    description: OpenAI API Key for AI features
+envVarGroups:
+  - name: ai-employee-secrets
+    envVars:
+      - key: DATABASE_URL
+      - key: SECRET_KEY
+      - key: JWT_SECRET_KEY
+      - key: GMAIL_TOKEN
+      - key: OPENAI_API_KEY
