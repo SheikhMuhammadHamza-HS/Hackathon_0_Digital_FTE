@@ -8,8 +8,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.requests import Request
 from fastapi.responses import Response
 import logging
+import bcrypt
 from passlib.context import CryptContext
-from .database import SessionLocal, engine
+from .database import SessionLocal, engine, get_db
 from .models import UserDB, Base, AuditLogDB
 from sqlalchemy.orm import Session
 
@@ -78,15 +79,27 @@ class AuthManager:
         try:
             admin = db.query(UserDB).filter(UserDB.username == "admin").first()
             if not admin:
-                self.create_user(db, "admin", "admin123", SecurityLevel.ADMIN, email="admin@vaultos.ai", full_name="System Administrator")
+                # Use a password that passes validation: admin@123Admin
+                self.create_user(db, "admin", "admin@123Admin", SecurityLevel.ADMIN, email="admin@vaultos.ai", full_name="System Administrator")
         finally:
             db.close()
 
     def get_password_hash(self, password):
-        return pwd_context.hash(password)
+        salt = bcrypt.gensalt()
+        return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
     def verify_password(self, plain_password, hashed_password):
-        return pwd_context.verify(plain_password, hashed_password)
+        try:
+            return bcrypt.checkpw(
+                plain_password.encode('utf-8'), 
+                hashed_password.encode('utf-8')
+            )
+        except Exception:
+            # Fallback for old passlib hashes if any
+            try:
+                return pwd_context.verify(plain_password, hashed_password)
+            except Exception:
+                return False
 
     def create_user(
         self,
