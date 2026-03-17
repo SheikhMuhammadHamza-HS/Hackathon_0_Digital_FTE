@@ -16,9 +16,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application code
 COPY . .
 
-# Ensure the .env defaults to Cloud Node execution
+# Cloud environment settings
 ENV PLATINUM_MODE=cloud
 ENV PYTHONPATH=/app
+ENV PORT=8000
 
-# Railway/Render will run this startup script that launches both Vault Sync and the Main Engine
-CMD ["python", "scripts/cloud_startup.py"]
+# Start the FastAPI web server (Render Web Service)
+CMD ["sh", "-c", "gunicorn ai_employee.api.server:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8000}"]
