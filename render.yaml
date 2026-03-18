@@ -31,12 +31,12 @@ envVarGroups:
   - name: "ai-employee-shared"
     envVars:
       - key: "DATABASE_URL"
-        placeholder: "Neon PostgreSQL connection URL"
+        sync: false
       - key: "SECRET_KEY"
-        placeholder: "Application secret key"
+        sync: false
       - key: "JWT_SECRET_KEY"
-        placeholder: "JWT authentication secret key"
+        sync: false
       - key: "OPENAI_API_KEY"
-        placeholder: "OpenAI API Key"
+        sync: false
       - key: "GMAIL_TOKEN"
-        placeholder: "Google/Gmail API Token (Optional)"
+        sync: false
