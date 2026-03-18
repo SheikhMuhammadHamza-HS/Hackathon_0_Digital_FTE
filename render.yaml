@@ -1,8 +1,8 @@
 services:
-  # 1. Background Worker (Cloud Node)
+  # 1. Background Worker (Platinum Sync & Watchers)
   - type: worker
     name: ai-employee-worker
-    runtime: python
+    env: python
     buildCommand: pip install -r requirements.txt
     startCommand: python scripts/cloud_startup.py
     envVars:
@@ -10,6 +10,8 @@ services:
         value: "cloud"
       - key: SYNC_INTERVAL
         value: "300"
+      - key: PYTHONUNBUFFERED
+        value: "1"
       - key: DATABASE_URL
         fromParameter: database_url
       - key: SECRET_KEY
@@ -21,14 +23,13 @@ services:
       - key: OPENAI_API_KEY
         fromParameter: openai_api_key
 
-  # 2. Web Service (FastAPI API)
+  # 2. Web Service (FastAPI Backend)
   - type: web
     name: ai-employee-api
-    runtime: python
+    env: python
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn ai_employee.api.server:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
-    healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
         fromParameter: database_url
@@ -39,17 +40,12 @@ services:
 
 parameters:
   - key: database_url
-    description: Neon PostgreSQL connection URL
-    required: true
+    description: Neon PostgreSQL URL (postgresql://...)
   - key: secret_key
-    description: Application secret key
-    required: true
+    description: App Secret Key
   - key: jwt_secret_key
-    description: JWT secret key
-    required: true
+    description: JWT Secret Key
   - key: gmail_token
-    description: Gmail JSON token content (optional)
-    required: false
+    description: Google/Gmail API Token
   - key: openai_api_key
     description: OpenAI API Key
-    required: true
