@@ -82,7 +82,16 @@ app.add_middleware(
 # Initialize services
 report_service = ReportService()
 scheduler = get_scheduler()
-scheduler.start()
+
+@app.on_event("startup")
+async def startup_event():
+    """Execute startup tasks."""
+    try:
+        # Start the briefing scheduler
+        scheduler.start()
+        logger.info("Briefing scheduler started successfully on server startup")
+    except Exception as e:
+        logger.error(f"Failed to start scheduler on startup: {e}")
 
 # Exception handlers
 @app.exception_handler(AIEmployeeError)
