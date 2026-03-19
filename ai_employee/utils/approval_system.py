@@ -151,7 +151,12 @@ class ApprovalSystem:
     def _ensure_directories(self) -> None:
         """Ensure approval directories exist."""
         for path in [self.pending_path, self.approved_path, self.rejected_path, self.done_path]:
-            path.mkdir(parents=True, exist_ok=True)
+            try:
+                path.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                logger.error(f"Failed to create directory {path}: {e}")
+                # If directory creation fails, we might be in a restricted environment
+                # We'll continue and hope for the best, but most operations will fail later
 
     async def create_approval_request(
         self,

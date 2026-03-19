@@ -32,6 +32,7 @@ from .auth import (
     get_optional_user,
     require_level,
     SecurityLevel,
+    User,
     auth_manager,
     audit_logger,
     AuthenticationError

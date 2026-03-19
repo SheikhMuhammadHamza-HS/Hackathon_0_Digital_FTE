@@ -10,15 +10,22 @@ from pydantic import BaseModel, Field
 import asyncio
 
 from ..utils.backup_manager import backup_manager
-from ..utils.auth import get_current_user, require_permission
-from ..utils.logger import setup_logger
+from .auth import get_current_user, require_permission, SecurityLevel, User
+import logging
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
+
+def check_permission(user: User, permission: str) -> bool:
+    """Helper to check if user has permission or is admin."""
+    if user.level == SecurityLevel.ADMIN:
+        return True
+    return permission in user.permissions
+
 router = APIRouter(prefix="/api/v1/backup", tags=["backup"])
 
 # Pydantic models for request/response
 class BackupRequest(BaseModel):
-    backup_type: str = Field(default="daily", regex="^(daily|weekly|monthly|manual)$")
+    backup_type: str = Field(default="daily", pattern="^(daily|weekly|monthly|manual)$")
     include_media: bool = Field(default=True)
     encrypt: bool = Field(default=True)
     comment: Optional[str] = Field(default=None)
@@ -78,7 +85,7 @@ class BackupStatistics(BaseModel):
 async def create_backup(
     request: BackupRequest,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Create a new backup
@@ -86,7 +93,7 @@ async def create_backup(
     Requires backup management permission
     """
     # Check permission
-    if not require_permission(current_user, "backup:manage"):
+    if not check_permission(current_user, "backup:manage"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
     try:
@@ -101,7 +108,7 @@ async def create_backup(
         if result["status"] == "error":
             raise HTTPException(status_code=500, detail=result["message"])
 
-        logger.info(f"Backup created by user {current_user['username']}: {result['backup_id']}")
+        logger.info(f"Backup created by user {current_user.username}: {result['backup_id']}")
 
         return BackupResponse(**result)
 
@@ -115,14 +122,14 @@ async def create_backup(
 async def create_backup_background(
     request: BackupRequest,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Create a backup in the background
 
     Requires backup management permission
     """
-    if not require_permission(current_user, "backup:manage"):
+    if not check_permission(current_user, "backup:manage"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
     # Add to background tasks
@@ -134,7 +141,7 @@ async def create_backup_background(
         comment=request.comment
     )
 
-    logger.info(f"Background backup initiated by user {current_user['username']}")
+    logger.info(f"Background backup initiated by user {current_user.username}")
 
     return {
         "status": "accepted",
@@ -145,14 +152,14 @@ async def create_backup_background(
 @router.get("/list", response_model=List[BackupInfo])
 async def list_backups(
     backup_type: Optional[str] = Query(None, regex="^(daily|weekly|monthly|manual)$"),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     List available backups
 
     Requires backup view permission
     """
-    if not require_permission(current_user, "backup:view"):
+    if not check_permission(current_user, "backup:view"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
     try:
@@ -166,14 +173,14 @@ async def list_backups(
 @router.get("/verify/{backup_id}", response_model=BackupVerificationResponse)
 async def verify_backup(
     backup_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Verify backup integrity
 
     Requires backup view permission
     """
-    if not require_permission(current_user, "backup:view"):
+    if not check_permission(current_user, "backup:view"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
     try:
@@ -188,20 +195,20 @@ async def verify_backup(
 async def restore_backup(
     request: RestoreRequest,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Restore from backup
 
     Requires system administration permission
     """
-    if not require_permission(current_user, "system:admin"):
+    if not check_permission(current_user, "system:admin"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
     try:
         # Verify backup exists first
         verification = await backup_manager.verify_backup(request.backup_id)
-        if verification.status == "error":
+        if verification["status"] == "error":
             raise HTTPException(status_code=404, detail="Backup not found or corrupted")
 
         # For safety, require force flag or implement confirmation mechanism
@@ -220,7 +227,7 @@ async def restore_backup(
             force=request.force
         )
 
-        logger.warning(f"Backup restore performed by user {current_user['username']}: {request.backup_id}")
+        logger.warning(f"Backup restore performed by user {current_user.username}: {request.backup_id}")
 
         return RestoreResponse(**result)
 
@@ -234,14 +241,14 @@ async def restore_backup(
 async def restore_backup_background(
     request: RestoreRequest,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Restore from backup in background
 
     Requires system administration permission
     """
-    if not require_permission(current_user, "system:admin"):
+    if not check_permission(current_user, "system:admin"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
     if not request.force:
@@ -258,7 +265,7 @@ async def restore_backup_background(
         force=request.force
     )
 
-    logger.warning(f"Background backup restore initiated by user {current_user['username']}: {request.backup_id}")
+    logger.warning(f"Background backup restore initiated by user {current_user.username}: {request.backup_id}")
 
     return {
         "status": "accepted",
@@ -268,14 +275,14 @@ async def restore_backup_background(
 
 @router.get("/statistics", response_model=BackupStatistics)
 async def get_backup_statistics(
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get backup statistics
 
     Requires backup view permission
     """
-    if not require_permission(current_user, "backup:view"):
+    if not check_permission(current_user, "backup:view"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
     try:
@@ -288,19 +295,19 @@ async def get_backup_statistics(
 
 @router.post("/schedule/automatic")
 async def schedule_automatic_backups(
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Schedule automatic backups
 
     Requires system administration permission
     """
-    if not require_permission(current_user, "system:admin"):
+    if not check_permission(current_user, "system:admin"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
     try:
         await backup_manager.schedule_automatic_backups()
-        logger.info(f"Automatic backup schedules configured by user {current_user['username']}")
+        logger.info(f"Automatic backup schedules configured by user {current_user.username}")
 
         return {
             "status": "success",
@@ -319,14 +326,14 @@ async def schedule_automatic_backups(
 @router.delete("/{backup_id}")
 async def delete_backup(
     backup_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Delete a backup
 
     Requires backup management permission
     """
-    if not require_permission(current_user, "backup:manage"):
+    if not check_permission(current_user, "backup:manage"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
     try:
@@ -365,7 +372,7 @@ async def delete_backup(
         async with aiofiles.open(registry_file, 'w') as f:
             await f.write(json.dumps(registry, indent=2))
 
-        logger.info(f"Backup deleted by user {current_user['username']}: {backup_id}")
+        logger.info(f"Backup deleted by user {current_user.username}: {backup_id}")
 
         return {
             "status": "success",
@@ -381,14 +388,14 @@ async def delete_backup(
 @router.get("/download/{backup_id}")
 async def download_backup(
     backup_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Generate download URL for backup
 
     Requires backup view permission
     """
-    if not require_permission(current_user, "backup:view"):
+    if not check_permission(current_user, "backup:view"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
     try:
@@ -414,7 +421,7 @@ async def download_backup(
         # or use a file streaming response
         from fastapi.responses import FileResponse
 
-        logger.info(f"Backup download requested by user {current_user['username']}: {backup_id}")
+        logger.info(f"Backup download requested by user {current_user.username}: {backup_id}")
 
         return FileResponse(
             path=str(backup_path),
@@ -462,29 +469,3 @@ async def backup_health_check():
             "status": "error",
             "message": f"Health check failed: {str(e)}"
         }
-
-# Error handlers
-@router.exception_handler(404)
-async def backup_not_found_handler(request, exc):
-    return {
-        "error": "backup_not_found",
-        "message": "The specified backup was not found",
-        "status_code": 404
-    }
-
-@router.exception_handler(403)
-async def permission_denied_handler(request, exc):
-    return {
-        "error": "permission_denied",
-        "message": "You don't have permission to perform this action",
-        "status_code": 403
-    }
-
-@router.exception_handler(500)
-async def internal_error_handler(request, exc):
-    logger.error(f"Internal server error in backup API: {str(exc)}")
-    return {
-        "error": "internal_server_error",
-        "message": "An internal server error occurred",
-        "status_code": 500
-    }
