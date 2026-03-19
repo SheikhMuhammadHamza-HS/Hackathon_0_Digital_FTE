@@ -314,16 +314,16 @@ class ConfigManager:
         vault_path = Path(os.getenv("VAULT_PATH", "./Vault"))
         config.paths = PathsConfig(
             vault_path=vault_path,
-            inbox_path=vault_path / "Inbox",
-            needs_action_path=vault_path / "Needs_Action",
-            pending_approval_path=vault_path / "Pending_Approval",
-            approved_path=vault_path / "Approved",
-            rejected_path=vault_path / "Rejected",
-            done_path=vault_path / "Done",
-            logs_path=vault_path / "Logs",
-            reports_path=vault_path / "Reports",
-            archive_path=vault_path / "Archive",
-            config_path=vault_path / "Config",
+            inbox_path=Path(os.getenv("INBOX_PATH", str(vault_path / "Inbox"))),
+            needs_action_path=Path(os.getenv("NEEDS_ACTION_PATH", str(vault_path / "Needs_Action"))),
+            pending_approval_path=Path(os.getenv("PENDING_APPROVAL_PATH", str(vault_path / "Pending_Approval"))),
+            approved_path=Path(os.getenv("APPROVED_PATH", str(vault_path / "Approved"))),
+            rejected_path=Path(os.getenv("REJECTED_PATH", str(vault_path / "Rejected"))),
+            done_path=Path(os.getenv("DONE_PATH", str(vault_path / "Done"))),
+            logs_path=Path(os.getenv("LOGS_PATH", str(vault_path / "Logs"))),
+            reports_path=Path(os.getenv("REPORTS_PATH", str(vault_path / "Reports"))),
+            archive_path=Path(os.getenv("ARCHIVE_PATH", str(vault_path / "Archive"))),
+            config_path=Path(os.getenv("CONFIG_PATH", str(vault_path / "Config"))),
         )
 
         return config
