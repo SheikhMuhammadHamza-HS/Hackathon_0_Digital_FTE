@@ -1,4 +1,5 @@
-services:
+git commit -m "Force Python 3.12"
+git push origin 001-ai-employeeservices:
   # 1. Combined Web & Background Service (FREE TIER)
   - type: "web"
     name: "ai-employee-all-in-one"
