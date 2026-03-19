@@ -1,5 +1,6 @@
 """Security utilities for AI Employee system."""
 
+import hmac
 import hashlib
 import secrets
 import time
@@ -199,7 +200,7 @@ class TokenManager:
 
         # Simple token encoding (in production, use proper JWT library)
         token_data = json.dumps(payload)
-        signature = hashlib.hmac(
+        signature = hmac.new(
             self.secret_key.encode(),
             token_data.encode(),
             hashlib.sha256
@@ -223,7 +224,7 @@ class TokenManager:
             token_data, signature = token.rsplit(".", 1)
 
             # Verify signature
-            expected_signature = hashlib.hmac(
+            expected_signature = hmac.new(
                 self.secret_key.encode(),
                 token_data.encode(),
                 hashlib.sha256
