@@ -50,7 +50,7 @@ from .backup import router as backup_router
 from ..utils.retention_scheduler import retention_task_manager
 from ..utils.monitoring import monitoring_dashboard
 
-from ..core.config import get_config
+from ..core.config import get_config, AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -244,54 +244,75 @@ async def login(email: str, password: str, db: Session = Depends(get_db)):
 
 
 @app.get("/api/v1/approvals")
-async def get_approvals(user: User = Depends(require_level(SecurityLevel.USER))):
-    """Get list of real pending approvals from the filesystem."""
+def get_approvals(config: AppConfig = Depends(get_config)):
+    """Fetch pending approvals from local filesystem."""
     try:
-        config = get_config()
-        pending_dir = config.paths.pending_approval_path
+        # Check multiple potential paths for flexibility (local, cloud, different variants)
+        potential_paths = []
         
-        if not pending_dir.exists():
-            return {"approvals": [], "total": 0}
-            
+        # 1. Path from config (the canonical one)
+        potential_paths.append(config.paths.pending_approval_path)
+        
+        # 2. Hardcoded fallbacks based on project structure
+        potential_paths.append(Path("Vault/Workflow/Pending_Approval"))
+        potential_paths.append(Path("Vault/Pending_Approval"))
+        potential_paths.append(Path("./Vault/Pending_Approval"))
+        
+        # Log search paths (visible in Render logs)
+        print(f"DEBUG: Searching for approvals in: {[str(p) for p in potential_paths]}")
+        
+        files = []
+        actual_path_used = None
+        
+        for p in potential_paths:
+            if p.exists() and p.is_dir():
+                found = list(p.glob("*.md"))
+                if found:
+                    files = found
+                    actual_path_used = p
+                    print(f"DEBUG: Found {len(files)} files in {p}")
+                    break
+        
+        if not files:
+            return {"approvals": [], "total": 0, "checked_paths": [str(p) for p in potential_paths]}
+
         approvals_list = []
-        for file_path in pending_dir.glob("*.md"):
+        for f in files:
             try:
-                content = file_path.read_text(encoding='utf-8')
-                # Parse headers
-                lines = content.split('\n')
+                content = f.read_text(encoding='utf-8')
+                # Simple parsing for draft headers
                 headers = {}
-                body_start = 0
-                for i, line in enumerate(lines):
-                    if ":" in line:
-                        key, val = line.split(":", 1)
-                        headers[key.strip().lower()] = val.strip()
+                for line in content.split('\n'):
+                    if ':' in line:
+                        k, v = line.split(':', 1)
+                        headers[k.strip().lower()] = v.strip()
                     elif not line.strip():
-                        body_start = i + 1
                         break
                 
-                # Create approval object
                 approvals_list.append({
-                    "id": file_path.stem,
+                    "id": f.stem,
                     "type": headers.get("platform", "Email").capitalize(),
                     "title": f"Review {headers.get('platform', 'Email')} Draft",
                     "description": f"Subject: {headers.get('subject', 'No Subject')} | To: {headers.get('to', 'Unknown')}",
-                    "priority": "Medium", # Default
-                    "time": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(),
-                    "file_path": str(file_path)
+                    "priority": "Medium",
+                    "time": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
+                    "file_path": str(f.absolute())
                 })
             except Exception as fe:
-                logger.error(f"Error parsing approval file {file_path}: {fe}")
-                
+                print(f"DEBUG: Error reading {f.name}: {fe}")
+                continue
+
         # Sort by newest first
         approvals_list.sort(key=lambda x: x["time"], reverse=True)
         
         return {
             "approvals": approvals_list,
-            "total": len(approvals_list)
+            "total": len(approvals_list),
+            "location": str(actual_path_used)
         }
     except Exception as e:
         logger.error(f"Failed to fetch approvals: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"approvals": [], "error": str(e)}
 
 
 @app.post("/api/v1/auth/register")
