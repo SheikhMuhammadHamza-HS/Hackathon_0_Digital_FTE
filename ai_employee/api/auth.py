@@ -156,7 +156,7 @@ class AuthManager:
         db_user.last_login = datetime.now()
         db.commit()
 
-        return User(
+        user_obj = User(
             user_id=str(db_user.id),
             username=db_user.username,
             level=SecurityLevel(db_user.level),
@@ -164,6 +164,9 @@ class AuthManager:
             full_name=db_user.full_name,
             permissions=db_user.permissions
         )
+        print(f"DEBUG AUTH: User obj has level: {hasattr(user_obj, 'level')}")
+        return user_obj
+
 
     def authenticate_api_key(self, api_key: str) -> Optional[User]:
         """Authenticate using API key."""

@@ -141,3 +141,7 @@ credentials.json
 mcp.json
 mcp-servers/*/node_modules/
 node_modules/
+env_dump.txt
+debug_*.txt
+*.txt.bak
+
