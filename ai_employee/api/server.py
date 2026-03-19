@@ -37,7 +37,8 @@ from .auth import (
     audit_logger,
     AuthenticationError
 )
-from .database import get_db
+from .database import get_db, SessionLocal
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from .models import UserDB
 from .data_retention import router as retention_router
@@ -302,39 +303,62 @@ async def root():
 async def health_check():
     """Health check endpoint with detailed service status."""
     try:
+        from ..core.config import get_config
+        config = get_config()
+        
+        # Initialize basic status
+        services_status = {
+            "reporting": "active",
+            "scheduler": scheduler.get_schedule_status()["is_running"],
+            "api": "active",
+            "database": "unknown",
+            "file_system": "unknown"
+        }
+        
+        env_info = {
+            "python_version": f"{datetime.now().year}",
+            "debug": config.debug,
+            "platinum_mode": config.platinum_mode
+        }
+        
         health_status = {
             "status": "healthy",
-            "timestamp": datetime.now(),
-            "version": "1.0.0",
-            "uptime": "N/A",  # Could be calculated from app startup time
-            "services": {
-                "reporting": "active",
-                "scheduler": scheduler.get_schedule_status()["is_running"],
-                "api": "active",
-                "database": "unknown",  # Could add actual DB health check
-                "file_system": "unknown"  # Could add Vault directory check
-            },
-            "environment": {
-                "python_version": f"{datetime.now().year}",  # Placeholder
-                "debug": False
-            }
+            "timestamp": datetime.now().isoformat(),
+            "version": "1.0.1",
+            "uptime": "N/A",
+            "services": services_status,
+            "environment": env_info
         }
 
         # Check Vault directory structure
         try:
-            from pathlib import Path
-            vault_path = Path.home() / "Vault"
+            vault_path = config.paths.vault_path
             if vault_path.exists():
                 required_dirs = ["Inbox", "Needs_Action", "Done", "Logs", "Pending_Approval"]
                 missing_dirs = [d for d in required_dirs if not (vault_path / d).exists()]
                 if missing_dirs:
-                    health_status["services"]["file_system"] = f"missing_dirs: {missing_dirs}"
+                    services_status["file_system"] = f"missing_dirs: {missing_dirs}"
                 else:
-                    health_status["services"]["file_system"] = "healthy"
+                    services_status["file_system"] = "healthy"
             else:
-                health_status["services"]["file_system"] = "vault_directory_missing"
+                services_status["file_system"] = "vault_directory_missing"
+                # Proactively try to create it
+                try:
+                    vault_path.mkdir(parents=True, exist_ok=True)
+                    services_status["file_system"] = "created_now"
+                except:
+                    pass
         except Exception as e:
-            health_status["services"]["file_system"] = f"error: {str(e)}"
+            services_status["file_system"] = f"error: {str(e)}"
+
+        # Check Database
+        try:
+            db = SessionLocal()
+            db.execute(text("SELECT 1"))
+            services_status["database"] = "healthy"
+            db.close()
+        except Exception as e:
+            services_status["database"] = f"connection_error: {str(e)}"
 
         return health_status
 
