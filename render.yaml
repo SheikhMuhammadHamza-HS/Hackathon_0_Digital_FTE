@@ -16,19 +16,21 @@ services:
         value: "1"
       - key: "PYTHON_VERSION"
         value: "3.12.1"
-      # Paths ko explicitly relative kar rahe hain taake /Vault permissions ka error na aaye
+      # VAULT_PATH ko explicitly relative kar rahe hain taake /Vault error khatam ho jaye
+      - key: "VAULT_PATH"
+        value: "./Vault"
       - key: "INBOX_PATH"
-        value: "./Vault/Workflow/Inbox"
+        value: "./Vault/Inbox"
       - key: "NEEDS_ACTION_PATH"
-        value: "./Vault/Workflow/Needs_Action"
+        value: "./Vault/Needs_Action"
       - key: "DONE_PATH"
-        value: "./Vault/Workflow/Done"
+        value: "./Vault/Done"
       - key: "LOGS_PATH"
-        value: "./Vault/Workflow/Logs"
+        value: "./Vault/Logs"
       - key: "PENDING_APPROVAL_PATH"
-        value: "./Vault/Workflow/Pending_Approval"
+        value: "./Vault/Pending_Approval"
       - key: "APPROVED_PATH"
-        value: "./Vault/Workflow/Approved"
+        value: "./Vault/Approved"
 
 envVarGroups:
   - name: "ai-employee-shared"
