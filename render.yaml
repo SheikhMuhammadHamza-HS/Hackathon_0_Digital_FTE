@@ -1,5 +1,4 @@
-git commit -m "Force Python 3.12"
-git push origin 001-ai-employeeservices:
+services:
   # 1. Combined Web & Background Service (FREE TIER)
   - type: "web"
     name: "ai-employee-all-in-one"
@@ -16,7 +15,20 @@ git push origin 001-ai-employeeservices:
       - key: "PYTHONUNBUFFERED"
         value: "1"
       - key: "PYTHON_VERSION"
-        value: "3.12.1" # Stable version specify kardi hai
+        value: "3.12.1"
+      # Paths ko explicitly relative kar rahe hain taake /Vault permissions ka error na aaye
+      - key: "INBOX_PATH"
+        value: "./Vault/Workflow/Inbox"
+      - key: "NEEDS_ACTION_PATH"
+        value: "./Vault/Workflow/Needs_Action"
+      - key: "DONE_PATH"
+        value: "./Vault/Workflow/Done"
+      - key: "LOGS_PATH"
+        value: "./Vault/Workflow/Logs"
+      - key: "PENDING_APPROVAL_PATH"
+        value: "./Vault/Workflow/Pending_Approval"
+      - key: "APPROVED_PATH"
+        value: "./Vault/Workflow/Approved"
 
 envVarGroups:
   - name: "ai-employee-shared"
