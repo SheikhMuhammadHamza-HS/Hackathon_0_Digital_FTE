@@ -3,6 +3,7 @@ import sys
 import asyncio
 from pathlib import Path
 from dotenv import load_dotenv
+import time
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -61,5 +62,4 @@ async def run_health_monitor():
         await monitor.shutdown()
 
 if __name__ == "__main__":
-    import time
     asyncio.run(run_health_monitor())

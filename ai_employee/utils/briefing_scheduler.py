@@ -84,11 +84,10 @@ class BriefingScheduler:
 
         # Schedule monthly summary
         if self.config["schedule"]["monthly_summary"]["enabled"]:
-            day = self.config["schedule"]["monthly_summary"]["day_of_month"]
-            time = self.config["schedule"]["monthly_summary"]["time"]
-            schedule.every().month.at(f"{day} {time}").do(self._generate_monthly_summary)
+            # Note: schedule library doesn't support .month(), using 30 days as approximation
+            schedule.every(30).days.at(self.config["schedule"]["monthly_summary"]["time"]).do(self._generate_monthly_summary)
             logger.info(
-                f"Scheduled monthly summary for day {day} at {time}"
+                f"Scheduled monthly summary for every 30 days at {self.config['schedule']['monthly_summary']['time']}"
             )
 
         # Start the scheduler loop
