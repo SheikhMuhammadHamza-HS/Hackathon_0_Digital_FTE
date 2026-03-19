@@ -82,6 +82,7 @@ app.add_middleware(
 # Initialize services
 report_service = ReportService()
 scheduler = get_scheduler()
+scheduler.start()
 
 # Exception handlers
 @app.exception_handler(AIEmployeeError)
@@ -309,7 +310,7 @@ async def health_check():
         # Initialize basic status
         services_status = {
             "reporting": "active",
-            "scheduler": scheduler.get_schedule_status()["is_running"],
+            "scheduler": scheduler.is_running,
             "api": "active",
             "database": "unknown",
             "file_system": "unknown"
@@ -333,8 +334,23 @@ async def health_check():
         # Check Vault directory structure
         try:
             vault_path = config.paths.vault_path
+            
+            # Proactively try to create vault root
+            if not vault_path.exists():
+                try:
+                    vault_path.mkdir(parents=True, exist_ok=True)
+                except:
+                    pass
+
             if vault_path.exists():
-                required_dirs = ["Inbox", "Needs_Action", "Done", "Logs", "Pending_Approval"]
+                required_dirs = ["Inbox", "Needs_Action", "Done", "Logs", "Pending_Approval", "Approved", "Rejected"]
+                # Try to create all subdirs
+                for d in required_dirs:
+                    try:
+                        (vault_path / d).mkdir(parents=True, exist_ok=True)
+                    except:
+                        pass
+                
                 missing_dirs = [d for d in required_dirs if not (vault_path / d).exists()]
                 if missing_dirs:
                     services_status["file_system"] = f"missing_dirs: {missing_dirs}"
@@ -342,12 +358,6 @@ async def health_check():
                     services_status["file_system"] = "healthy"
             else:
                 services_status["file_system"] = "vault_directory_missing"
-                # Proactively try to create it
-                try:
-                    vault_path.mkdir(parents=True, exist_ok=True)
-                    services_status["file_system"] = "created_now"
-                except:
-                    pass
         except Exception as e:
             services_status["file_system"] = f"error: {str(e)}"
 
