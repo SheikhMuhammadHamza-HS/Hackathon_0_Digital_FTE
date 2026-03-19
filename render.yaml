@@ -5,7 +5,6 @@ services:
     runtime: "python"
     plan: "free"
     buildCommand: "pip install -r requirements.txt"
-    # Hum API start karte waqt hi background scripts ko bhi start kar denge
     startCommand: "python scripts/cloud_startup_combined.py"
     envVars:
       - fromGroup: "ai-employee-shared"
@@ -24,6 +23,8 @@ envVarGroups:
       - key: "SECRET_KEY"
         sync: false
       - key: "JWT_SECRET_KEY"
+        sync: false
+      - key: "GEMINI_API_KEY"
         sync: false
       - key: "OPENAI_API_KEY"
         sync: false
