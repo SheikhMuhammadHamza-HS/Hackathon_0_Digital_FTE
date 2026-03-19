@@ -38,7 +38,11 @@ async def run_health_monitor():
             report_mem = await monitor.run_check("memory_usage")
             
             # Simple status signal for the Dashboard UI
-            status_text = f"| {time.strftime('%Y-%m-%d %H:%M:%S')} | System Health: {report.status.value.upper()} | CPU: {report.metrics[0].value}% | RAM: {report_mem.metrics[0].value}% |"
+            status_name = report.status.name if hasattr(report.status, 'name') else str(report.status)
+            cpu_val = report.metrics[0].value if report.metrics else 0
+            ram_val = report_mem.metrics[0].value if report_mem.metrics else 0
+            
+            status_text = f"| {time.strftime('%Y-%m-%d %H:%M:%S')} | System Health: {status_name} | CPU: {cpu_val}% | RAM: {ram_val}% |"
             
             # Write signal file
             signal_file = updates_dir / "health_signal.txt"
