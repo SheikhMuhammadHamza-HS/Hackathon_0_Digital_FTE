@@ -9,10 +9,13 @@ from fastapi.requests import Request
 from fastapi.responses import Response
 import logging
 import bcrypt
+import secrets
 from passlib.context import CryptContext
 from .database import SessionLocal, engine, get_db
 from .models import UserDB, Base, AuditLogDB
 from sqlalchemy.orm import Session
+
+from ..utils.error_handlers import AIEmployeeError, ErrorCategory, ErrorSeverity
 
 from ..utils.security import (
     SecurityMiddleware,
@@ -35,14 +38,26 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-class AuthenticationError(Exception):
+class AuthenticationError(AIEmployeeError):
     """Authentication error."""
-    pass
+    def __init__(self, message: str, user_message: Optional[str] = None):
+        super().__init__(
+            message=message,
+            category=ErrorCategory.VALIDATION,
+            severity=ErrorSeverity.MEDIUM,
+            user_message=user_message or "Authentication failed. Please check your credentials."
+        )
 
 
-class AuthorizationError(Exception):
+class AuthorizationError(AIEmployeeError):
     """Authorization error."""
-    pass
+    def __init__(self, message: str, user_message: Optional[str] = None):
+        super().__init__(
+            message=message,
+            category=ErrorCategory.PERMISSION,
+            severity=ErrorSeverity.HIGH,
+            user_message=user_message or "You don't have permission to perform this action."
+        )
 
 
 class User:
@@ -460,17 +475,30 @@ def audit_action(event_type: str):
                     user = value
                     break
 
+            # Get DB session from kwargs
+            db = kwargs.get('db')
+            if not db:
+                db = SessionLocal()
+                should_close = True
+            else:
+                should_close = False
+
             # Execute function
             result = await func(*args, **kwargs)
 
             # Log audit event
-            audit_logger.log(
-                event_type=event_type,
-                user_id=user.user_id if user else None,
-                details={"function": func.__name__},
-                ip_address="",  # Would need to extract from request
-                user_agent=None
-            )
+            try:
+                audit_logger.log(
+                    db=db,
+                    event_type=event_type,
+                    user_id=user.user_id if user else None,
+                    details={"function": func.__name__},
+                    ip_address="",  # Would need to extract from request
+                    user_agent=None
+                )
+            finally:
+                if should_close:
+                    db.close()
 
             return result
         return wrapper
