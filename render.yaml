@@ -1,29 +1,18 @@
 services:
-  # 1. Background Worker (Cloud Node)
-  - type: "worker"
-    name: "ai-employee-worker"
+  # 1. Combined Web & Background Service (FREE TIER)
+  - type: "web"
+    name: "ai-employee-all-in-one"
     runtime: "python"
-    plan: "starter"
+    plan: "free"
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python scripts/cloud_startup.py"
+    # Hum API start karte waqt hi background scripts ko bhi start kar denge
+    startCommand: "python scripts/cloud_startup_combined.py"
     envVars:
       - fromGroup: "ai-employee-shared"
       - key: "PLATINUM_MODE"
         value: "cloud"
       - key: "SYNC_INTERVAL"
         value: "300"
-      - key: "PYTHONUNBUFFERED"
-        value: "1"
-
-  # 2. Web Service (FastAPI Backend API)
-  - type: "web"
-    name: "ai-employee-api"
-    runtime: "python"
-    plan: "free"
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn ai_employee.api.server:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT"
-    envVars:
-      - fromGroup: "ai-employee-shared"
       - key: "PYTHONUNBUFFERED"
         value: "1"
 
