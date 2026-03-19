@@ -21,7 +21,11 @@ if not SQLALCHEMY_DATABASE_URL:
     SQLALCHEMY_DATABASE_URL = "sqlite:///./sql_app.db"
     print("WARNING: DATABASE_URL not found, using SQLite fallback.")
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    pool_pre_ping=True,  # Check connectivity before using a connection
+    pool_recycle=300     # Recycle connections every 5 minutes
+)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
