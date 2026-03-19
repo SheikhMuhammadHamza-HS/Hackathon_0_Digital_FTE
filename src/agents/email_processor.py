@@ -14,6 +14,7 @@ from ..config.logging_config import get_logger
 
 from ..utils.handbook_loader import load_handbook
 from ..services.planner import Planner
+from ai_employee.utils.db_logger import log_agent_activity
 
 logger = get_logger(__name__)
 
@@ -125,8 +126,23 @@ class EmailProcessor:
                 thread_id=thread_id,
                 message_id=message_id
             )
+            
+            # Log to Dashboard DB
+            log_agent_activity(
+                event_type="email_draft",
+                details={
+                    "subject": subject,
+                    "to": to_addr,
+                    "status": "success",
+                    "draft_length": len(draft_text)
+                }
+            )
         except Exception as e:
             logger.error(f"Failed to save draft file: {e}")
+            log_agent_activity(
+                event_type="email_error",
+                details={"error": str(e), "subject": subject, "to": to_addr}
+            )
             trigger_file.update_status(TriggerStatus.FAILED)
             return False
 

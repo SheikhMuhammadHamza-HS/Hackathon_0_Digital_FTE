@@ -14,6 +14,9 @@ SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Neon/SQLAlchemy compatibility fix: replace postgresql:// with postgresql+psycopg2:// if needed
 if SQLALCHEMY_DATABASE_URL and SQLALCHEMY_DATABASE_URL.startswith("postgresql://"):
+    if "sslmode=" not in SQLALCHEMY_DATABASE_URL:
+        separator = "&" if "?" in SQLALCHEMY_DATABASE_URL else "?"
+        SQLALCHEMY_DATABASE_URL += f"{separator}sslmode=require"
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
 
 if not SQLALCHEMY_DATABASE_URL:
