@@ -311,7 +311,7 @@ class ConfigManager:
         )
 
         # Paths configuration
-        vault_path = Path(os.getenv("VAULT_PATH", "/Vault"))
+        vault_path = Path(os.getenv("VAULT_PATH", "./Vault"))
         config.paths = PathsConfig(
             vault_path=vault_path,
             inbox_path=vault_path / "Inbox",
