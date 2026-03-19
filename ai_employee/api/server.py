@@ -39,10 +39,10 @@ from .auth import (
     audit_logger,
     AuthenticationError
 )
-from .database import get_db, SessionLocal
+from .database import get_db, SessionLocal, engine
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-from .models import UserDB
+from .models import UserDB, Base
 from .data_retention import router as retention_router
 from .gdpr import router as gdpr_router
 from .monitoring import router as monitoring_router
@@ -96,6 +96,10 @@ scheduler = get_scheduler()
 async def startup_event():
     """Execute startup tasks."""
     try:
+        # Create database tables if they don't exist
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created/verified successfully")
+        
         # Start the briefing scheduler
         scheduler.start()
         logger.info("Briefing scheduler started successfully on server startup")

@@ -25,8 +25,8 @@ from ..utils.security import (
 
 logger = logging.getLogger(__name__)
 
-# Tables are created via app startup, not module import
-# Base.metadata.create_all(bind=engine)
+# Tables are created at module load for AuthManager readiness
+Base.metadata.create_all(bind=engine)
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
