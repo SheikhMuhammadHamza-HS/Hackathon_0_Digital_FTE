@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 from dotenv import load_dotenv
 import time
+from datetime import datetime
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -43,7 +44,9 @@ async def run_health_monitor():
             cpu_val = report.metrics[0].value if report.metrics else 0
             ram_val = report_mem.metrics[0].value if report_mem.metrics else 0
             
-            status_text = f"| {time.strftime('%Y-%m-%d %H:%M:%S')} | System Health: {status_name} | CPU: {cpu_val}% | RAM: {ram_val}% |"
+            # Use datetime instead of time to avoid potential module-name shadowing issues
+            current_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            status_text = f"| {current_time_str} | System Health: {status_name} | CPU: {cpu_val}% | RAM: {ram_val}% |"
             
             # Write signal file
             signal_file = updates_dir / "health_signal.txt"
