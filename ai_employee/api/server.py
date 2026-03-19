@@ -231,11 +231,14 @@ async def login(email: str, password: str, db: Session = Depends(get_db)):
             }
         }
 
+    except AIEmployeeError as e:
+        logger.error(f"Login error: {e.message}")
+        raise HTTPException(status_code=401, detail=e.user_message)
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Login error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Authentication failed")
+        logger.error(f"Unexpected login error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Authentication failed: {str(e)}")
 
 
 @app.post("/api/v1/auth/register")
