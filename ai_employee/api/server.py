@@ -50,6 +50,8 @@ from .backup import router as backup_router
 from ..utils.retention_scheduler import retention_task_manager
 from ..utils.monitoring import monitoring_dashboard
 
+from ..core.config import get_config
+
 logger = logging.getLogger(__name__)
 
 # Track server start time
@@ -239,6 +241,57 @@ async def login(email: str, password: str, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Unexpected login error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Authentication failed: {str(e)}")
+
+
+@app.get("/api/v1/approvals")
+async def get_approvals(user: User = Depends(require_level(SecurityLevel.USER))):
+    """Get list of real pending approvals from the filesystem."""
+    try:
+        config = get_config()
+        pending_dir = config.paths.pending_approval_path
+        
+        if not pending_dir.exists():
+            return {"approvals": [], "total": 0}
+            
+        approvals_list = []
+        for file_path in pending_dir.glob("*.md"):
+            try:
+                content = file_path.read_text(encoding='utf-8')
+                # Parse headers
+                lines = content.split('\n')
+                headers = {}
+                body_start = 0
+                for i, line in enumerate(lines):
+                    if ":" in line:
+                        key, val = line.split(":", 1)
+                        headers[key.strip().lower()] = val.strip()
+                    elif not line.strip():
+                        body_start = i + 1
+                        break
+                
+                # Create approval object
+                approvals_list.append({
+                    "id": file_path.stem,
+                    "type": headers.get("platform", "Email").capitalize(),
+                    "title": f"Review {headers.get('platform', 'Email')} Draft",
+                    "description": f"Subject: {headers.get('subject', 'No Subject')} | To: {headers.get('to', 'Unknown')}",
+                    "priority": "Medium", # Default
+                    "time": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(),
+                    "file_path": str(file_path)
+                })
+            except Exception as fe:
+                logger.error(f"Error parsing approval file {file_path}: {fe}")
+                
+        # Sort by newest first
+        approvals_list.sort(key=lambda x: x["time"], reverse=True)
+        
+        return {
+            "approvals": approvals_list,
+            "total": len(approvals_list)
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch approvals: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/v1/auth/register")

@@ -102,3 +102,7 @@ export async function fetchSubscriptionAudit() {
 export async function fetchBottlenecks() {
   return apiFetch("/analysis/bottlenecks");
 }
+
+export async function fetchApprovals() {
+  return apiFetch("/approvals");
+}
