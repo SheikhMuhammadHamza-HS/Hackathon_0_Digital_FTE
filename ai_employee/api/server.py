@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 import logging
+import sys
+import time
 
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Depends, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -49,6 +51,9 @@ from ..utils.retention_scheduler import retention_task_manager
 from ..utils.monitoring import monitoring_dashboard
 
 logger = logging.getLogger(__name__)
+
+# Track server start time
+START_TIME = time.time()
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -325,8 +330,15 @@ async def health_check():
             "file_system": "unknown"
         }
         
+        # Calculate uptime
+        uptime_seconds = int(time.time() - START_TIME)
+        days, rem = divmod(uptime_seconds, 86400)
+        hours, rem = divmod(rem, 3600)
+        minutes, seconds = divmod(rem, 60)
+        uptime_str = f"{days}d {hours}h {minutes}m {seconds}s"
+        
         env_info = {
-            "python_version": f"{datetime.now().year}",
+            "python_version": sys.version.split()[0],
             "debug": config.debug,
             "platinum_mode": config.platinum_mode
         }
@@ -335,7 +347,7 @@ async def health_check():
             "status": "healthy",
             "timestamp": datetime.now().isoformat(),
             "version": "1.0.1",
-            "uptime": "N/A",
+            "uptime": uptime_str,
             "services": services_status,
             "environment": env_info
         }
