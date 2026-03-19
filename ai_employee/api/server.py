@@ -78,7 +78,11 @@ app.add_middleware(SecurityMiddlewareHTTP)
 # Add CORS middleware (restrict in production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8080"],  # Restrict to known origins
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "https://hackathon-0-digital-fte.vercel.app"
+    ],  # Restrict to known origins
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
