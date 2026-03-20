@@ -60,8 +60,7 @@ class MetricResponse(BaseModel):
 
 @router.get("/dashboard", response_model=DashboardResponse)
 async def get_dashboard(
-    refresh: bool = Query(False, description="Force refresh of dashboard data"),
-    user: User = Depends(require_level(SecurityLevel.USER))
+    refresh: bool = Query(False, description="Force refresh of dashboard data")
 ):
     """Get monitoring dashboard data."""
     try:
@@ -72,9 +71,7 @@ async def get_dashboard(
 
 
 @router.get("/health", response_model=List[HealthCheckResponse])
-async def get_health_status(
-    user: User = Depends(get_current_user)
-):
+async def get_health_status():
     """Get current health status of all components."""
     try:
         health_checks = await monitoring_dashboard.health_monitor.run_health_checks()
@@ -124,8 +121,7 @@ async def get_specific_health_check(
 @router.get("/metrics")
 async def get_metrics(
     metric_names: Optional[str] = Query(None),
-    hours: int = Query(1, ge=1, le=168),  # Max 7 days
-    user: User = Depends(require_level(SecurityLevel.USER))
+    hours: int = Query(1, ge=1, le=168)  # Max 7 days
 ):
     """Get metrics data."""
     try:
@@ -254,9 +250,7 @@ async def get_system_metrics(
 
 
 @router.get("/application")
-async def get_application_metrics(
-    user: User = Depends(get_current_user)
-):
+async def get_application_metrics():
     """Get application metrics."""
     try:
         app_metrics = await monitoring_dashboard.metrics_collector.collect_application_metrics()
