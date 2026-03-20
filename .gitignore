@@ -46,6 +46,7 @@ Thumbs.db
 # Logs
 *.log
 logs/
+!frontend/src/app/logs/
 log/
 
 # OS generated files
@@ -112,14 +113,13 @@ local/
 tmp/
 temp/
 
-# Application specific
-Inbox/
-Needs_Action/
-Approved/
-Pending_Approval/
-Done/
-Failed/
-Rejected/
+# Vault items should be tracked for sync
+!Vault/Workflow/Inbox/
+!Vault/Workflow/Needs_Action/
+!Vault/Workflow/Approved/
+!Vault/Workflow/Pending_Approval/
+!Vault/Workflow/Done/
+!Vault/Workflow/Failed/
 Logs/
 Plans/
 Briefings/
