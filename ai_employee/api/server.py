@@ -314,6 +314,114 @@ def get_approvals(config: AppConfig = Depends(get_config)):
         print(f"DEBUG: Error fetching approvals: {e}")
         return {"approvals": [], "error": str(e), "total": 0}
 
+
+@app.post("/api/v1/approvals/{approval_id}/approve")
+def approve_draft(approval_id: str, config: AppConfig = Depends(get_config)):
+    """Approve a pending draft: send the email and move file to Done."""
+    try:
+        # Find the draft file
+        potential_paths = [
+            config.paths.pending_approval_path,
+            Path("Vault/Workflow/Pending_Approval"),
+            Path("Vault/Pending_Approval"),
+        ]
+
+        draft_file = None
+        for p in potential_paths:
+            if p.exists():
+                for f in p.glob("*.md"):
+                    if f.stem == approval_id:
+                        draft_file = f
+                        break
+            if draft_file:
+                break
+
+        if not draft_file:
+            raise HTTPException(status_code=404, detail=f"Draft '{approval_id}' not found")
+
+        # Move to Approved folder first
+        approved_dir = Path("Vault/Workflow/Approved")
+        approved_dir.mkdir(parents=True, exist_ok=True)
+        approved_path = approved_dir / draft_file.name
+
+        import shutil
+        shutil.move(str(draft_file), str(approved_path))
+        print(f"DEBUG: Moved draft to {approved_path}")
+
+        # Try to send the email
+        send_success = False
+        try:
+            from src.agents.email_sender import EmailSender
+            sender = EmailSender()
+            send_success = sender.send_draft(approved_path)
+        except Exception as send_err:
+            print(f"DEBUG: Email send error (non-fatal): {send_err}")
+
+        # Move to Done folder
+        done_dir = Path("Vault/Workflow/Done")
+        done_dir.mkdir(parents=True, exist_ok=True)
+        done_path = done_dir / draft_file.name
+        shutil.move(str(approved_path), str(done_path))
+        print(f"DEBUG: Moved to Done: {done_path}")
+
+        return {
+            "status": "approved",
+            "email_sent": send_success,
+            "message": f"Draft approved and {'sent' if send_success else 'archived (send failed)'}",
+            "file": str(done_path)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"DEBUG: Approve error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/approvals/{approval_id}/reject")
+def reject_draft(approval_id: str, config: AppConfig = Depends(get_config)):
+    """Reject a pending draft and move to Rejected folder."""
+    try:
+        potential_paths = [
+            config.paths.pending_approval_path,
+            Path("Vault/Workflow/Pending_Approval"),
+            Path("Vault/Pending_Approval"),
+        ]
+
+        draft_file = None
+        for p in potential_paths:
+            if p.exists():
+                for f in p.glob("*.md"):
+                    if f.stem == approval_id:
+                        draft_file = f
+                        break
+            if draft_file:
+                break
+
+        if not draft_file:
+            raise HTTPException(status_code=404, detail=f"Draft '{approval_id}' not found")
+
+        rejected_dir = Path("Vault/Workflow/Rejected")
+        rejected_dir.mkdir(parents=True, exist_ok=True)
+        rejected_path = rejected_dir / draft_file.name
+
+        import shutil
+        shutil.move(str(draft_file), str(rejected_path))
+        print(f"DEBUG: Rejected draft moved to {rejected_path}")
+
+        return {
+            "status": "rejected",
+            "message": "Draft rejected and archived",
+            "file": str(rejected_path)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"DEBUG: Reject error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/v1/logs")
 def get_audit_logs(limit: int = 50, db: Session = Depends(get_db)):
     """Fetch recent audit logs from the database."""

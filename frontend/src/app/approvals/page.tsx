@@ -13,7 +13,7 @@ import {
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
-import { fetchApprovals } from "@/services/api";
+import { fetchApprovals, approveApproval, rejectApproval } from "@/services/api";
 
 const container = {
   hidden: { opacity: 0 },
@@ -32,6 +32,7 @@ export default function ApprovalsPage() {
   const [approvals, setApprovals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const loadApprovals = async () => {
     setLoading(true);
@@ -133,10 +134,38 @@ export default function ApprovalsPage() {
                 </div>
 
                 <div className="flex flex-row md:flex-col gap-3 shrink-0">
-                  <button className="flex items-center justify-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition-all hover:scale-[1.02] active:scale-95 glow-purple">
-                    <CheckCircle2 className="w-4 h-4" /> Approve
+                  <button
+                    disabled={actionLoading === app.id}
+                    onClick={async () => {
+                      setActionLoading(app.id);
+                      try {
+                        await approveApproval(app.id);
+                        setApprovals(prev => prev.filter(a => a.id !== app.id));
+                      } catch (err: any) {
+                        alert("Approve failed: " + (err.message || "Unknown error"));
+                      } finally {
+                        setActionLoading(null);
+                      }
+                    }}
+                    className="flex items-center justify-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition-all hover:scale-[1.02] active:scale-95 glow-purple disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {actionLoading === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Approve
                   </button>
-                  <button className="flex items-center justify-center gap-2 px-6 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02] active:scale-95 border border-zinc-700/50">
+                  <button
+                    disabled={actionLoading === app.id}
+                    onClick={async () => {
+                      setActionLoading(app.id);
+                      try {
+                        await rejectApproval(app.id);
+                        setApprovals(prev => prev.filter(a => a.id !== app.id));
+                      } catch (err: any) {
+                        alert("Reject failed: " + (err.message || "Unknown error"));
+                      } finally {
+                        setActionLoading(null);
+                      }
+                    }}
+                    className="flex items-center justify-center gap-2 px-6 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02] active:scale-95 border border-zinc-700/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
                     <XCircle className="w-4 h-4" /> Reject
                   </button>
                 </div>

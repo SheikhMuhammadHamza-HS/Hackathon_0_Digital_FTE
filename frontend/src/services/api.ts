@@ -106,3 +106,11 @@ export async function fetchBottlenecks() {
 export async function fetchApprovals() {
   return apiFetch("/approvals");
 }
+
+export async function approveApproval(id: string) {
+  return apiFetch(`/approvals/${id}/approve`, { method: "POST" });
+}
+
+export async function rejectApproval(id: string) {
+  return apiFetch(`/approvals/${id}/reject`, { method: "POST" });
+}
