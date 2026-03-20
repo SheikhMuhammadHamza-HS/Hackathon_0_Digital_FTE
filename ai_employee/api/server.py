@@ -310,10 +310,29 @@ def get_approvals(config: AppConfig = Depends(get_config)):
             "total": len(approvals_list),
             "location": str(actual_path_used)
         }
+@app.get("/api/v1/logs")
+def get_audit_logs(limit: int = 50, db: Session = Depends(get_db)):
+    """Fetch recent audit logs from the database."""
+    try:
+        # Import local AuditLogDB safely
+        from .models import AuditLogDB
+        logs = db.query(AuditLogDB).order_by(AuditLogDB.timestamp.desc()).limit(limit).all()
+        
+        # Format logs for frontend
+        output = []
+        for log in logs:
+            output.append({
+                "id": log.id,
+                "event_type": log.event_type,
+                "user_id": log.user_id,
+                "details": log.details,
+                "timestamp": log.timestamp.isoformat(),
+                "ip_address": log.ip_address
+            })
+        return {"logs": output, "total": len(output)}
     except Exception as e:
-        logger.error(f"Failed to fetch approvals: {e}")
-        return {"approvals": [], "error": str(e)}
-
+        logger.error(f"Failed to fetch audit logs: {e}")
+        return {"logs": [], "error": str(e)}
 
 @app.post("/api/v1/auth/register")
 async def register(email: str, password: str, full_name: str, db: Session = Depends(get_db)):
