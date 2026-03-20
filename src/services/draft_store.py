@@ -82,6 +82,9 @@ class DraftStore:
                     f.write(f"Message-ID: {message_id}\n")
                 f.write(f"To: {to_addr}\n\n")
                 f.write(body)
+            
+            # FORCE PRINT for cloud debugging
+            print(f"\n🚀 [FILE STORED] Final Absolute Path: {draft_path.absolute()}\n")
             logger.info(f"Draft saved to {draft_path}")
             return draft_path
         except Exception as e:
