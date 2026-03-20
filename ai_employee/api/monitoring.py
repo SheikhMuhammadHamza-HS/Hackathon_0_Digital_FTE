@@ -149,8 +149,7 @@ async def get_metrics(
 async def get_alerts(
     severity: Optional[str] = Query(None),
     resolved: Optional[bool] = Query(None),
-    limit: int = Query(50, ge=1, le=1000),
-    user: User = Depends(require_level(SecurityLevel.USER))
+    limit: int = Query(50, ge=1, le=1000)
 ):
     """Get monitoring alerts."""
     try:
