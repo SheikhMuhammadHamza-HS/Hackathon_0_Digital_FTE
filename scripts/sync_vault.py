@@ -44,21 +44,29 @@ def sync_vault(polling_interval=60):
         if not is_git_repo:
             logger.warning("🚫 Not a git repository! Vault Sync (Pull/Push) is disabled.")
             logger.info("ℹ️ To enable cloud sync, ensure .git folder is included in the deployment.")
-            
             # Keep process alive to not crash cloud_startup
             while True:
                 time.sleep(polling_interval * 10)
-                
+        
+        # Check if origin remote exists
+        success, remote_out = run_git_command(["git", "remote"], cwd=repo_root)
+        has_origin = success and "origin" in remote_out.splitlines()
+        
+        if not has_origin:
+            logger.warning("⚠️ 'origin' remote not found! Vault Sync will only monitor local file changes.")
+            logger.info("ℹ️ Git-based Vault pull/push is disabled until origin is configured.")
+            
         while True:
-            # 1. Pull latest changes from Cloud/Local
-            logger.info("⬇️ Pulling latest Vault changes...")
-            success, pull_out = run_git_command(["git", "pull", "--rebase", "--autostash", "origin", branch], cwd=repo_root)
-            if not success:
-                logger.warning(f"⚠️ Merge/Pull issue (could be offline): {pull_out}")
+            # 1. Pull latest changes from Cloud/Local (only if origin exists)
+            if has_origin:
+                logger.info("⬇️ Pulling latest Vault changes...")
+                success, pull_out = run_git_command(["git", "pull", "--rebase", "--autostash", "origin", branch], cwd=repo_root)
+                if not success:
+                    logger.warning(f"⚠️ Merge/Pull issue (could be offline): {pull_out}")
             
             # 2. Check if Vault has local changes
             success, status_out = run_git_command(["git", "status", "--porcelain", "Vault/"], cwd=repo_root)
-            if success and status_out.strip():
+            if success and status_out.strip() and has_origin:
                 logger.info(f"⬆️ Local changes detected in Vault/. Pushing to {branch}...")
                 
                 # Add only the Vault directory
@@ -71,6 +79,8 @@ def sync_vault(polling_interval=60):
                     logger.info("✅ Vault synced successfully.")
                 else:
                     logger.error(f"❌ Failed to push: {push_out}")
+            elif success and status_out.strip() and not has_origin:
+                logger.info("ℹ️ Local changes detected in Vault/ but skipping push (no origin remote).")
             
             time.sleep(polling_interval)
             
