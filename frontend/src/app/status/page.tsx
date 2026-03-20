@@ -119,7 +119,7 @@ export default function CloudStatusPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-zinc-500">Load Average (1/5/15)</span>
                   <span className="text-zinc-300 font-mono">
-                    {data?.load?.join(" ") || "0.05 0.12 0.08"}
+                    {data?.load && Array.isArray(data.load) ? data.load.join(" ") : data?.load ? Object.values(data.load).join(" ") : "0.05 0.12 0.08"}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
