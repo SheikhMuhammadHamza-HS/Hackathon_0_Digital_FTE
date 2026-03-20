@@ -310,6 +310,10 @@ def get_approvals(config: AppConfig = Depends(get_config)):
             "total": len(approvals_list),
             "location": str(actual_path_used)
         }
+    except Exception as e:
+        print(f"DEBUG: Error fetching approvals: {e}")
+        return {"approvals": [], "error": str(e), "total": 0}
+
 @app.get("/api/v1/logs")
 def get_audit_logs(limit: int = 50, db: Session = Depends(get_db)):
     """Fetch recent audit logs from the database."""
