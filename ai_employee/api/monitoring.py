@@ -205,8 +205,7 @@ async def resolve_alert(
 
 @router.get("/performance/summary")
 async def get_performance_summary(
-    hours: int = Query(24, ge=1, le=168),
-    user: User = Depends(require_level(SecurityLevel.USER))
+    hours: int = Query(24, ge=1, le=168)
 ):
     """Get performance summary."""
     try:
@@ -219,8 +218,7 @@ async def get_performance_summary(
 
 @router.get("/system")
 async def get_system_metrics(
-    detailed: bool = Query(False, description="Include detailed system metrics"),
-    user: User = Depends(require_level(SecurityLevel.USER))
+    detailed: bool = Query(False, description="Include detailed system metrics")
 ):
     """Get system metrics."""
     try:
