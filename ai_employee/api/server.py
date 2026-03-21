@@ -253,8 +253,10 @@ def get_approvals(config: AppConfig = Depends(get_config)):
         # 1. Path from config (the canonical one)
         potential_paths.append(config.paths.pending_approval_path)
         
-        # 2. Hardcoded fallbacks based on project structure
+        # 2. Hardcoded fallbacks - Workflow path should be HIGHEST priority
         potential_paths.append(Path("Vault/Workflow/Pending_Approval"))
+        
+        # 3. Old legacy paths
         potential_paths.append(Path("Vault/Pending_Approval"))
         potential_paths.append(Path("./Vault/Pending_Approval"))
         
@@ -262,16 +264,15 @@ def get_approvals(config: AppConfig = Depends(get_config)):
         print(f"DEBUG: Searching for approvals in: {[str(p) for p in potential_paths]}")
         
         files = []
-        actual_path_used = None
+        actual_paths_found = []
         
         for p in potential_paths:
             if p.exists() and p.is_dir():
                 found = list(p.glob("*.md"))
                 if found:
-                    files = found
-                    actual_path_used = p
-                    print(f"DEBUG: Found {len(files)} files in {p}")
-                    break
+                    files.extend(found)
+                    actual_paths_found.append(str(p))
+                    print(f"DEBUG: Found {len(found)} files in {p}")
         
         if not files:
             return {"approvals": [], "total": 0, "checked_paths": [str(p) for p in potential_paths]}
@@ -308,7 +309,7 @@ def get_approvals(config: AppConfig = Depends(get_config)):
         return {
             "approvals": approvals_list,
             "total": len(approvals_list),
-            "location": str(actual_path_used)
+            "locations": actual_paths_found
         }
     except Exception as e:
         print(f"DEBUG: Error fetching approvals: {e}")
