@@ -245,50 +245,31 @@ async def login(email: str, password: str, db: Session = Depends(get_db)):
 
 @app.get("/api/v1/approvals")
 def get_approvals(config: AppConfig = Depends(get_config)):
-    """Fetch pending approvals from local filesystem."""
+    """Fetch pending approvals: Prioritizing local-to-cloud memory store."""
     try:
-        # Check multiple potential paths for flexibility (local, cloud, different variants)
-        potential_paths = []
-        
-        # 1. Path from config (the canonical one)
-        potential_paths.append(config.paths.pending_approval_path)
-        
-        # 2. Hardcoded fallbacks - Workflow path should be HIGHEST priority
-        potential_paths.append(Path("Vault/Workflow/Pending_Approval"))
-        
-        # 3. Old legacy paths
-        potential_paths.append(Path("Vault/Pending_Approval"))
-        potential_paths.append(Path("./Vault/Pending_Approval"))
-        
-        # Log search paths (visible in Render logs)
-        print(f"DEBUG: Searching for approvals in: {[str(p) for p in potential_paths]}")
-        
+        # ONLY check the current standard path to avoid reading old ghost files
+        workflow_path = Path("Vault/Workflow/Pending_Approval")
         files = []
-        actual_paths_found = []
+        if workflow_path.exists() and workflow_path.is_dir():
+            files = list(workflow_path.glob("*.md"))
         
-        for p in potential_paths:
-            if p.exists() and p.is_dir():
-                found = list(p.glob("*.md"))
-                if found:
-                    files.extend(found)
-                    actual_paths_found.append(str(p))
-                    print(f"DEBUG: Found {len(found)} files in {p}")
-        
-        if not files:
-            return {"approvals": [], "total": 0, "checked_paths": [str(p) for p in potential_paths]}
-
         approvals_list = []
+        # 1. Add everything from memory first
+        for draft_id, draft_data in _cloud_drafts.items():
+            approvals_list.append(draft_data)
+            
+        # 2. Add disk files not already in memory
+        existing_ids = {a["id"] for a in approvals_list}
         for f in files:
+            if f.stem in existing_ids: continue
             try:
                 content = f.read_text(encoding='utf-8')
-                # Simple parsing for draft headers
                 headers = {}
                 for line in content.split('\n'):
                     if ':' in line:
                         k, v = line.split(':', 1)
                         headers[k.strip().lower()] = v.strip()
-                    elif not line.strip():
-                        break
+                    elif not line.strip(): break
                 
                 approvals_list.append({
                     "id": f.stem,
@@ -297,129 +278,99 @@ def get_approvals(config: AppConfig = Depends(get_config)):
                     "description": f"Subject: {headers.get('subject', 'No Subject')} | To: {headers.get('to', 'Unknown')}",
                     "priority": "Medium",
                     "time": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
-                    "file_path": str(f.absolute())
+                    "file_path": str(f.absolute()),
+                    "content": content
                 })
-            except Exception as fe:
-                print(f"DEBUG: Error reading {f.name}: {fe}")
-                continue
+            except Exception: continue
 
-        # Sort by newest first
-        approvals_list.sort(key=lambda x: x["time"], reverse=True)
-        
-        return {
-            "approvals": approvals_list,
-            "total": len(approvals_list),
-            "locations": actual_paths_found
-        }
+        approvals_list.sort(key=lambda x: x.get("time", ""), reverse=True)
+        return {"approvals": approvals_list, "total": len(approvals_list)}
     except Exception as e:
-        print(f"DEBUG: Error fetching approvals: {e}")
         return {"approvals": [], "error": str(e), "total": 0}
+
+
+# In-memory store for cloud-received drafts
+_cloud_drafts: Dict[str, Dict[str, Any]] = {}
+
+
+@app.post("/api/v1/approvals/upload")
+def upload_draft(draft: Dict[str, Any]):
+    """Receive a draft directly from local watcher for instant dashboard update."""
+    try:
+        draft_id = draft.get("id")
+        if not draft_id: return {"status": "error", "message": "Missing ID"}
+        _cloud_drafts[draft_id] = draft
+        print(f"DEBUG: Instant draft uploaded to cloud: {draft_id}")
+        return {"status": "ok", "id": draft_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/v1/approvals/{approval_id}/approve")
 def approve_draft(approval_id: str, config: AppConfig = Depends(get_config)):
-    """Approve a pending draft: send the email and move file to Done."""
+    """Approve a draft: Memory first, then disk."""
     try:
-        # Find the draft file
-        potential_paths = [
-            config.paths.pending_approval_path,
-            Path("Vault/Workflow/Pending_Approval"),
-            Path("Vault/Pending_Approval"),
-        ]
-
+        draft_content = None
+        
+        # 1. Memory Check
+        if approval_id in _cloud_drafts:
+            draft_content = _cloud_drafts[approval_id].get("content")
+            del _cloud_drafts[approval_id]
+        
+        # 2. Disk Check
+        workflow_path = Path("Vault/Workflow/Pending_Approval")
         draft_file = None
-        for p in potential_paths:
-            if p.exists():
-                for f in p.glob("*.md"):
-                    if f.stem == approval_id:
-                        draft_file = f
-                        break
-            if draft_file:
-                break
+        if workflow_path.exists():
+            for f in workflow_path.glob("*.md"):
+                if f.stem == approval_id:
+                    draft_file = f
+                    if not draft_content:
+                        draft_content = f.read_text(encoding="utf-8")
+                    break
 
-        if not draft_file:
-            raise HTTPException(status_code=404, detail=f"Draft '{approval_id}' not found")
+        if not draft_content:
+            raise HTTPException(status_code=404, detail="Draft content not found")
 
-        # Move to Approved folder first
+        # Prepare for send
         approved_dir = Path("Vault/Workflow/Approved")
         approved_dir.mkdir(parents=True, exist_ok=True)
-        approved_path = approved_dir / draft_file.name
+        temp_file = approved_dir / f"{approval_id}.md"
+        temp_file.write_text(draft_content, encoding="utf-8")
+        
+        from src.agents.email_sender import EmailSender
+        success = EmailSender().send_draft(temp_file)
 
-        import shutil
-        shutil.move(str(draft_file), str(approved_path))
-        print(f"DEBUG: Moved draft to {approved_path}")
-
-        # Try to send the email
-        send_success = False
-        try:
-            from src.agents.email_sender import EmailSender
-            sender = EmailSender()
-            send_success = sender.send_draft(approved_path)
-        except Exception as send_err:
-            print(f"DEBUG: Email send error (non-fatal): {send_err}")
-
-        # Move to Done folder
+        # Move to Done and Cleanup
         done_dir = Path("Vault/Workflow/Done")
         done_dir.mkdir(parents=True, exist_ok=True)
-        done_path = done_dir / draft_file.name
-        shutil.move(str(approved_path), str(done_path))
-        print(f"DEBUG: Moved to Done: {done_path}")
+        import shutil
+        shutil.move(str(temp_file), str(done_dir / f"{approval_id}.md"))
+        if draft_file and draft_file.exists(): 
+            draft_file.unlink()
 
-        return {
-            "status": "approved",
-            "email_sent": send_success,
-            "message": f"Draft approved and {'sent' if send_success else 'archived (send failed)'}",
-            "file": str(done_path)
-        }
-
-    except HTTPException:
-        raise
+        return {"status": "approved", "sent": success}
     except Exception as e:
-        print(f"DEBUG: Approve error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/v1/approvals/{approval_id}/reject")
 def reject_draft(approval_id: str, config: AppConfig = Depends(get_config)):
-    """Reject a pending draft and move to Rejected folder."""
+    """Reject a draft and cleanup."""
     try:
-        potential_paths = [
-            config.paths.pending_approval_path,
-            Path("Vault/Workflow/Pending_Approval"),
-            Path("Vault/Pending_Approval"),
-        ]
-
-        draft_file = None
-        for p in potential_paths:
-            if p.exists():
-                for f in p.glob("*.md"):
-                    if f.stem == approval_id:
-                        draft_file = f
-                        break
-            if draft_file:
-                break
-
-        if not draft_file:
-            raise HTTPException(status_code=404, detail=f"Draft '{approval_id}' not found")
-
-        rejected_dir = Path("Vault/Workflow/Rejected")
-        rejected_dir.mkdir(parents=True, exist_ok=True)
-        rejected_path = rejected_dir / draft_file.name
-
-        import shutil
-        shutil.move(str(draft_file), str(rejected_path))
-        print(f"DEBUG: Rejected draft moved to {rejected_path}")
-
-        return {
-            "status": "rejected",
-            "message": "Draft rejected and archived",
-            "file": str(rejected_path)
-        }
-
-    except HTTPException:
-        raise
+        if approval_id in _cloud_drafts:
+            del _cloud_drafts[approval_id]
+            
+        workflow_path = Path("Vault/Workflow/Pending_Approval")
+        if workflow_path.exists():
+            for f in workflow_path.glob("*.md"):
+                if f.stem == approval_id:
+                    rejected_dir = Path("Vault/Workflow/Rejected")
+                    rejected_dir.mkdir(parents=True, exist_ok=True)
+                    import shutil
+                    shutil.move(str(f), str(rejected_dir / f.name))
+                    break
+        return {"status": "rejected"}
     except Exception as e:
-        print(f"DEBUG: Reject error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

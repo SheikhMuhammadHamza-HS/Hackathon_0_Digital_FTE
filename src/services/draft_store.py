@@ -18,11 +18,14 @@ class DraftStore:
     """
 
     def __init__(self, pending_dir: str | Path = None):
+        # Base dir is Vault/Workflow
+        self.base_workflow_dir = Path("Vault/Workflow")
         if pending_dir:
             self.pending_dir = Path(pending_dir)
         else:
-            # Use absolute path from project root
-            self.pending_dir = Path(settings.BASE_DIR) / settings.PENDING_APPROVAL_PATH
+            # Default to Gmail path as it's the most common
+            self.pending_dir = self.base_workflow_dir / "Gmail" / "Pending_Approval"
+            
         self.pending_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"DraftStore initialized with directory: {self.pending_dir}")
 
