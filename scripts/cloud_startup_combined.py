@@ -10,8 +10,9 @@ def run_combined_node():
     print("🔄 Starting Vault Sync Daemon...")
     sync_process = subprocess.Popen([sys.executable, "scripts/sync_vault.py"])
     
-    print("📧 Starting Unified Watcher (Gmail)...")
-    watcher_process = subprocess.Popen([sys.executable, "scripts/start_unified_watcher.py"])
+    # 2. Skip Gmail Watcher on Cloud (Authority: Local PC to avoid duplicates)
+    print("ℹ️ Skipping Gmail Watcher on Cloud (Authority: Local PC)...")
+    # watcher_process = subprocess.Popen([sys.executable, "scripts/start_unified_watcher.py"])
     
     print("🏥 Starting Health Monitor...")
     health_process = subprocess.Popen([sys.executable, "scripts/start_health_monitor.py"])
@@ -37,7 +38,7 @@ def run_combined_node():
     except KeyboardInterrupt:
         print("\n🛑 Terminating Integrated Node...")
         sync_process.terminate()
-        watcher_process.terminate()
+        # watcher_process.terminate()  # Removed as we disabled watcher
         health_process.terminate()
         web_process.terminate()
 
