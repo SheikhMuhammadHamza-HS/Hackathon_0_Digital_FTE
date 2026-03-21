@@ -9,9 +9,9 @@ def run_cloud_node():
     print("🔄 Starting Vault Sync Daemon...")
     sync_process = subprocess.Popen([sys.executable, "scripts/sync_vault.py"])
     
-    # 2. Start the Unified Watcher (Gmail Triage)
-    print("📧 Starting Unified Watcher (Gmail)...")
-    watcher_process = subprocess.Popen([sys.executable, "scripts/start_unified_watcher.py"])
+    # 2. Skip Gmail Watcher on Cloud (let local PC be the authority to avoid duplicates)
+    print("ℹ️ Skipping Gmail Watcher on Cloud (Authority: Local PC)...")
+    # watcher_process = subprocess.Popen([sys.executable, "scripts/start_unified_watcher.py"])
     
     # 3. Start the Health Monitor
     print("🏥 Starting Health Monitor...")
@@ -21,14 +21,12 @@ def run_cloud_node():
     time.sleep(5)
     
     try:
-        # Keep everything running
+        # Keep essential services running
         sync_process.wait()
-        watcher_process.wait()
         health_process.wait()
     except KeyboardInterrupt:
         print("\n🛑 Terminating Cloud Node...")
         sync_process.terminate()
-        watcher_process.terminate()
         health_process.terminate()
     
 
